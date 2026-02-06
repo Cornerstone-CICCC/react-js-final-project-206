@@ -56,6 +56,7 @@ You can also choose to self-deploy in a custom server such as AWS or Google Clou
 - Your MVP needs to be responsive.
 - Design an ERD first before creating your database. This will help you layout how your data are connected and stored.
 - Make sure to store any API keys and other credentials inside your `.env` files. Never commit them into your respoitory!
+- Protect your CRUD API routes. For example, a user who is not logged in should not be able to send `PUT` and `DELETE` requests.
 - Communicate with your teammates.
 
 _Good luck with your project and looking forward to your work 🎉🎉🎉_
