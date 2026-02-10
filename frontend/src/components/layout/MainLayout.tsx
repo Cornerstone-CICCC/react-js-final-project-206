@@ -1,27 +1,23 @@
-import React from 'react';
+import Sidebar from './Sidebar';
+import Header from './Header';
 
-interface MainLayoutProps {
-  children: React.ReactNode;
-}
-
-const MainLayout = ({ children }: MainLayoutProps) => {
+export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
-    // 배경: brand-dark (다크 네이비)
-    <div className="flex h-screen w-full bg-brand-dark p-4 gap-4 overflow-hidden">
-      {/* 사이드바 자리: 나중에 A가 채울 예정 */}
-      <aside className="w-64 flex-shrink-0 hidden md:block">
-        <div className="h-full bg-transparent p-4">
-          <h1 className="text-white text-2xl font-bold mb-8">F-insight</h1>
-          {/* 사이드바 메뉴들이 들어갈 곳 */}
-        </div>
-      </aside>
+    <div className="flex h-screen w-full bg-brand-dark overflow-hidden font-sans">
+      <Sidebar />
 
-      {/* 메인 콘텐츠 영역: 시안의 둥근 화이트/그레이 배경 부분 */}
-      <main className="flex-1 bg-surface-bg rounded-[2.5rem] overflow-y-auto shadow-2xl relative">
-        <div className="p-8">{children}</div>
+      <main
+        className="flex-1 flex flex-col bg-surface-bg overflow-hidden shadow-2xl transition-all duration-300
+        m-0 lg:my-4 lg:mr-4 lg:rounded-[2.5rem] rounded-none"
+      >
+        <div className="flex-1 overflow-y-auto p-6 lg:p-8 custom-scrollbar">
+          <div className="lg:pt-0 pt-10">
+            <Header />
+          </div>
+
+          <section className="mt-4 lg:mt-2">{children}</section>
+        </div>
       </main>
     </div>
   );
-};
-
-export default MainLayout;
+}
