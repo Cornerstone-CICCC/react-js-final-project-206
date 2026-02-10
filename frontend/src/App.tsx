@@ -1,33 +1,73 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import MainLayout from './components/layout/MainLayout';
-import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Invite from './pages/Invite';
-import TestComponent from './pages/TestComponent';
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+import MainLayout from "./components/layout/MainLayout";
+import Dashboard from "./pages/Dashboard";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Invite from "./pages/Invite";
+import TestComponent from "./pages/TestComponent";
+
+import ProtectedRoute from "./routes/ProtectedRoute";
+import PartnerGate from "./routes/PartnerGate";
+import { useAuth } from "./contexts/AuthContext";
+
+function HomeRedirect() {
+  const { auth } = useAuth();
+
+  // 1) 로그인 안 했으면 /login
+  if (!auth.token) return <Navigate to="/login" replace />;
+
+  // 2) 로그인 했는데 user가 아직 없으면(새로고침 직후 등)
+  //    여기서는 일단 dashboard로 보내고, 실제로는 /me로 user 복구하는 로직을 권장
+  if (!auth.user) return <Navigate to="/dashboard" replace />;
+
+  // 3) partnerId 있으면 dashboard, 없으면 invite
+  return auth.user.partnerId ? (
+    <Navigate to="/dashboard" replace />
+  ) : (
+    <Navigate to="/invite" replace />
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* 인증 관련 페이지 (레이아웃 없음 또는 별도 배경) */}
+        {/* Public */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/invite" element={<Invite />} />
         <Route path="/test" element={<TestComponent />} />
 
-        {/* 대시보드 및 서비스 내부 페이지 (MainLayout 적용) */}
+        {/* Protected (로그인 필요) */}
         <Route
-          path="/dashboard"
+          path="/invite"
           element={
-            <MainLayout>
-              <Dashboard />
-            </MainLayout>
+            <ProtectedRoute>
+              <Invite />
+            </ProtectedRoute>
           }
         />
 
-        {/* 초기 경로 설정: 대시보드로 리다이렉트 (로그인 여부에 따라 추후 변경) */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {/* Protected + partnerId 필요 */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <PartnerGate>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </PartnerGate>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Entry */}
+        <Route path="/" element={<HomeRedirect />} />
+
+        {/* 404 */}
+        <Route path="*" element={<div style={{ padding: 24 }}>Not Found</div>} />
       </Routes>
     </BrowserRouter>
   );
