@@ -1,75 +1,55 @@
-import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
-import MainLayout from "./components/layout/MainLayout";
-import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Invite from "./pages/Invite";
-import TestComponent from "./pages/TestComponent";
+import MainLayout from './components/layout/MainLayout';
 
-import ProtectedRoute from "./routes/ProtectedRoute";
-import PartnerGate from "./routes/PartnerGate";
-import { useAuth } from "./contexts/AuthContext";
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Dashboard from './pages/Dashboard';
+import TestComponent from './pages/TestComponent';
 
-function HomeRedirect() {
-  const { auth } = useAuth();
+// bella 쪽에서 추가된 페이지들 (있는 경우만)
+import CalendarPage from './pages/Calendar';
+import { TransactionPage } from './pages/Transaction';
 
-  // 1) 로그인 안 했으면 /login
-  if (!auth.token) return <Navigate to="/login" replace />;
+// bella 쪽 Provider (경로/이름이 이대로여야 함)
+import { TransactionProvider } from './context/TransactionContext';
 
-  // 2) 로그인 했는데 user가 아직 없으면(새로고침 직후 등)
-  //    여기서는 일단 dashboard로 보내고, 실제로는 /me로 user 복구하는 로직을 권장
-  if (!auth.user) return <Navigate to="/dashboard" replace />;
-
-  // 3) partnerId 있으면 dashboard, 없으면 invite
-  return auth.user.partnerId ? (
-    <Navigate to="/dashboard" replace />
-  ) : (
-    <Navigate to="/invite" replace />
-  );
-}
+import ProtectedRoute from './routes/ProtectedRoute';
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Public */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/test" element={<TestComponent />} />
+    <TransactionProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/test" element={<TestComponent />} />
 
-        {/* Protected (로그인 필요) */}
-        <Route
-          path="/invite"
-          element={
-            <ProtectedRoute>
-              <Invite />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Protected + partnerId 필요 */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <PartnerGate>
+          {/* Protected 영역: 로그인 필요 */}
+          <Route
+            element={
+              <ProtectedRoute>
                 <MainLayout>
-                  <Dashboard />
+                  <Outlet />
                 </MainLayout>
-              </PartnerGate>
-            </ProtectedRoute>
-          }
-        />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/transaction" element={<TransactionPage />} />
+          </Route>
 
-        {/* Entry */}
-        <Route path="/" element={<HomeRedirect />} />
+          {/* Entry */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        {/* 404 */}
-        <Route path="*" element={<div style={{ padding: 24 }}>Not Found</div>} />
-      </Routes>
-    </BrowserRouter>
+          {/* 404 */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </TransactionProvider>
   );
 }
 

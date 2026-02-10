@@ -1,6 +1,7 @@
 import { Button } from '../components/common/Button';
 import { Share2, BarChart2, Download, Mail, Lock } from 'lucide-react';
 import { Input } from '../components/common/Input';
+import { showExpenseToast } from '../lib/notifications';
 
 export default function TestComponent() {
   return (
@@ -71,6 +72,18 @@ export default function TestComponent() {
               error="비밀번호가 일치하지 않습니다."
               className="text-gray-900"
             />
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold">4. Real-time Notification Test</h2>
+          <div className="bg-white p-8 rounded-2xl">
+            <Button
+              variant="primary"
+              onClick={() => showExpenseToast('Trinh Phuong', 'Starbucks Coffee', 8.5)}
+            >
+              Simulate Partner Expense
+            </Button>
           </div>
         </section>
 
