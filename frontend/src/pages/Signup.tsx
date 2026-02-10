@@ -1,14 +1,17 @@
 import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import zxcvbn from "zxcvbn";
+import toast from "react-hot-toast";
 
 import api from "../lib/api";
 import { createMockUser } from "../lib/mockAuth";
 import { useAuth, TOKEN_STORAGE_KEY } from "../contexts/AuthContext";
-import toast from "react-hot-toast"
 
 /** ✅ 백엔드 붙이면 false로 */
 const USE_MOCK = true;
+
+// ✅ Profile 페이지에서 읽는 localStorage 키 (Profile.tsx랑 동일해야 함)
+const PROFILE_STORAGE_KEY = "mock_profile_v1";
 
 type SignupFormState = {
   firstName: string;
@@ -43,16 +46,13 @@ export default function Signup() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
 
   const strength = useMemo(() => zxcvbn(form.password), [form.password]);
   const score = strength.score;
 
   const passwordRules = useMemo(() => {
     const minLenOk = form.password.length >= 8;
-    const matchOk =
-      form.password === form.confirmPassword &&
-      form.confirmPassword.length > 0;
+    const matchOk = form.password === form.confirmPassword && form.confirmPassword.length > 0;
     return { minLenOk, matchOk };
   }, [form.password, form.confirmPassword]);
 
@@ -63,15 +63,8 @@ export default function Signup() {
     const pwOk = passwordRules.minLenOk && score >= 2;
     const matchOk = passwordRules.matchOk;
 
-    return (
-      firstNameOk &&
-      lastNameOk &&
-      emailOk &&
-      pwOk &&
-      matchOk &&
-      !isSubmitting
-    );
-  }, [form, passwordRules, score, isSubmitting]);
+    return firstNameOk && lastNameOk && emailOk && pwOk && matchOk && !isSubmitting;
+  }, [form.firstName, form.lastName, form.email, passwordRules, score, isSubmitting]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -89,6 +82,18 @@ export default function Signup() {
       sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
       localStorage.removeItem(TOKEN_STORAGE_KEY);
     }
+  };
+
+  // ✅ Profile 페이지 자동 채움용 저장
+  const saveProfileForProfilePage = () => {
+    localStorage.setItem(
+      PROFILE_STORAGE_KEY,
+      JSON.stringify({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+      })
+    );
   };
 
   const strengthLabel = (s: number) => {
@@ -122,7 +127,6 @@ export default function Signup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg("");
     if (!canSubmit) return;
 
     try {
@@ -138,7 +142,7 @@ export default function Signup() {
       if (USE_MOCK) {
         await new Promise((r) => setTimeout(r, 300));
 
-        // ✅ 이미 있는 이메일이면 여기서 에러 throw 됨
+        // ✅ 이미 있는 이메일이면 createMockUser 내부에서 throw
         const created = createMockUser({
           email: payload.email,
           password: payload.password,
@@ -154,26 +158,33 @@ export default function Signup() {
           partnerId: created.partnerId ?? null,
         };
 
+        // ✅ Profile 페이지에서 보일 정보 저장
+        saveProfileForProfilePage();
+
         saveToken(fakeToken, form.remember);
         setAuth({ token: fakeToken, user: fakeUser });
 
-        // 가입 후 흐름은 너가 원하는 대로: 바로 dashboard
+        toast.success("Account created!");
         navigate("/dashboard", { replace: true });
         return;
       }
 
-
       const { data } = await api.post<SignupResponse>("/auth/signup", payload);
 
       if (data.token && data.user) {
+        // ✅ Profile 페이지에서 보일 정보 저장
+        saveProfileForProfilePage();
+
         saveToken(data.token, form.remember);
         setAuth({ token: data.token, user: data.user });
 
-        if (data.user.partnerId) navigate("/dashboard", { replace: true });
-        else navigate("/invite", { replace: true });
+        // 너가 정한 룰: invite 없음 → 무조건 dashboard
+        toast.success("Account created!");
+        navigate("/dashboard", { replace: true });
         return;
       }
 
+      toast.success("Account created! Please log in.");
       navigate("/login", { replace: true });
     } catch (err) {
       const message = normalizeError(err);
@@ -189,14 +200,8 @@ export default function Signup() {
         <h2 style={styles.title}>Create account</h2>
         <p style={styles.subtitle}>Sign up to get started</p>
 
-        {errorMsg && (
-          <div role="alert" style={styles.errorBox}>
-            {errorMsg}
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} style={{ width: "100%" }}>
-          {/* ✅ 이름 필드 (디자인/스타일 그대로) */}
+          {/* ✅ 이름 필드 */}
           <label style={styles.label}>
             First name
             <input
@@ -264,14 +269,11 @@ export default function Signup() {
             </div>
 
             <ul style={styles.rules}>
-              <li
-                style={passwordRules.minLenOk ? styles.ruleOk : styles.ruleBad}
-              >
+              <li style={passwordRules.minLenOk ? styles.ruleOk : styles.ruleBad}>
                 At least 8 characters
               </li>
               <li style={score >= 2 ? styles.ruleOk : styles.ruleBad}>
-                Prohibit overly simple passwords (strength level 2 or higher
-                recommended)
+                Prohibit overly simple passwords (strength level 2 or higher recommended)
               </li>
             </ul>
           </div>
@@ -340,17 +342,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: { margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" },
   subtitle: { margin: "8px 0 18px", fontSize: 13, color: "#64748b" },
-  errorBox: {
-    width: "100%",
-    background: "#fff1f2",
-    border: "1px solid #fecdd3",
-    color: "#9f1239",
-    padding: "10px 12px",
-    borderRadius: 10,
-    fontSize: 12,
-    fontWeight: 700,
-    marginBottom: 14,
-  },
   label: {
     width: "100%",
     display: "flex",

@@ -5,6 +5,7 @@ import MainLayout from './components/layout/MainLayout';
 
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import TestComponent from './pages/TestComponent';
 
@@ -37,6 +38,7 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="/profile" element={<Profile />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/transaction" element={<TransactionPage />} />

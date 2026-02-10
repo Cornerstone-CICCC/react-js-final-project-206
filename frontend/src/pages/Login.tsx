@@ -1,12 +1,16 @@
 import React, { useMemo, useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 import api from "../lib/api";
 import { TOKEN_STORAGE_KEY, useAuth } from "../contexts/AuthContext";
-import toast from "react-hot-toast";
 
 /** ✅ 백엔드 붙이면 false로 */
 const USE_MOCK = true;
+
+/** ✅ Signup(mock) 저장소 키 (Signup.tsx의 mockAuth.ts가 쓰는 키랑 맞춰야 함) */
+const MOCK_USERS_KEY = "mock_users_v1";
+const PROFILE_STORAGE_KEY = "mock_profile_v1";
 
 type LoginFormState = {
   email: string;
@@ -23,10 +27,41 @@ type LoginResponse = {
   };
 };
 
+type MockUser = {
+  id: string;
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  partnerId?: string | null;
+};
+
+function readMockUsers(): MockUser[] {
+  try {
+    const raw = localStorage.getItem(MOCK_USERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as MockUser[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMockProfile(u: MockUser) {
+  localStorage.setItem(
+    PROFILE_STORAGE_KEY,
+    JSON.stringify({
+      firstName: u.firstName ?? "",
+      lastName: u.lastName ?? "",
+      email: u.email,
+    })
+  );
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { auth, setAuth } = useAuth();
+  const { setAuth } = useAuth();
 
   const [form, setForm] = useState<LoginFormState>({
     email: "",
@@ -35,14 +70,6 @@ export default function Login() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  // 이미 로그인 상태면 접근 막기
-  // if (auth.token) {
-  //   if (auth.user?.partnerId) return <Navigate to="/dashboard" replace />;
-  //   if (auth.user && !auth.user.partnerId) return <Navigate to="/dashboard" replace />;
-  //   return <Navigate to="/dashboard" replace />;
-  // }
 
   const canSubmit = useMemo(() => {
     const emailOk = form.email.trim().length > 0;
@@ -80,9 +107,15 @@ export default function Login() {
     return "An error occurred during login.";
   };
 
+  const safeRedirectAfterLogin = () => {
+    const from = (location.state as any)?.from as string | undefined;
+    const blocked = ["/login", "/signup", "/invite"];
+    const safeFrom = from && !blocked.includes(from) ? from : undefined;
+    navigate(safeFrom ?? "/dashboard", { replace: true });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg("");
     if (!canSubmit) return;
 
     try {
@@ -93,46 +126,57 @@ export default function Login() {
         password: form.password,
       };
 
+      // =========================
+      // ✅ MOCK LOGIN
+      // =========================
       if (USE_MOCK) {
-  await new Promise((r) => setTimeout(r, 350));
-  const fakeToken = "mock_token_" + Math.random().toString(36).slice(2);
+        await new Promise((r) => setTimeout(r, 250));
 
-  // ✅ mock은 무조건 partnerId 있다고 가정 (어디서 partner gate를 걸어도 안 튕기게)
-  const fakeUser = {
-    id: "mock_user_id",
-    email: payload.email,
-    partnerId: "mock_partner_id",
-  };
+        const users = readMockUsers();
+        const found = users.find(
+          (u) => u.email.toLowerCase() === payload.email.toLowerCase()
+        );
 
-  saveToken(fakeToken, form.remember);
-  setAuth({ token: fakeToken, user: fakeUser });
+        if (!found) {
+          toast.error("No account found with this email. Please sign up first.");
+          return;
+        }
 
-  // ✅ from을 쓰더라도 invite/login/signup는 무시하고 dashboard로 보냄
-  const from = (location.state as any)?.from as string | undefined;
-  const safeFrom =
-    from && !["/invite", "/login", "/signup"].includes(from) ? from : undefined;
+        if (found.password !== payload.password) {
+          toast.error("Invalid email or password.");
+          return;
+        }
 
-  navigate(safeFrom ?? "/dashboard", { replace: true });
-  return;
-}
+        const token = "mock_token_" + Math.random().toString(36).slice(2);
 
+        // ✅ partner gate가 있어도 안 튕기게: mock은 partnerId 항상 있다고 처리
+        const userForAuth = {
+          id: found.id,
+          email: found.email,
+          partnerId: found.partnerId ?? "mock_partner_id",
+        };
 
+        saveToken(token, form.remember);
+        setAuth({ token, user: userForAuth });
+
+        // ✅ Profile 페이지가 채워지도록 mock_profile_v1 생성/갱신
+        writeMockProfile(found);
+
+        safeRedirectAfterLogin();
+        return;
+      }
+
+      // =========================
+      // ✅ REAL API LOGIN
+      // =========================
       const { data } = await api.post<LoginResponse>("/auth/login", payload);
 
       saveToken(data.token, form.remember);
       setAuth({ token: data.token, user: data.user });
 
-      const from = (location.state as any)?.from as string | undefined;
-      if (from) {
-        navigate(from, { replace: true });
-        return;
-      }
-
-      if (data.user.partnerId) navigate("/dashboard", { replace: true });
-      else navigate("/dashboard", { replace: true });
+      safeRedirectAfterLogin();
     } catch (err) {
-      const message = normalizeError(err);
-      toast.error(message);
+      toast.error(normalizeError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -191,12 +235,6 @@ export default function Login() {
           <div style={styles.formWrap}>
             <h2 style={styles.title}>Welcome back</h2>
             <p style={styles.subtitle}>Sign in to your account to continue</p>
-
-            {errorMsg && (
-              <div role="alert" style={styles.errorBox}>
-                {errorMsg}
-              </div>
-            )}
 
             <form onSubmit={handleSubmit} style={{ width: "100%" }}>
               <label style={styles.label}>
@@ -396,18 +434,6 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "10px 0 24px",
     fontSize: "13px",
     color: "#64748b",
-  },
-
-  errorBox: {
-    width: "100%",
-    background: "#fff1f2",
-    border: "1px solid #fecdd3",
-    color: "#9f1239",
-    padding: "10px 12px",
-    borderRadius: "10px",
-    fontSize: "12px",
-    fontWeight: 700,
-    marginBottom: "14px",
   },
 
   label: {
