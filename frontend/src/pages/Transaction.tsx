@@ -5,9 +5,6 @@ import {
   Search,
   ArrowUpDown,
   Tag,
-  Calendar as CalendarIcon,
-  Mail,
-  StickyNote,
   ChevronLeft,
   Trash2,
   Save,
@@ -15,9 +12,15 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  X,
+  StickyNote,
+  User,
+  Mail,
+  Lock,
+  RotateCcw,
+  Send,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { toast } from 'react-hot-toast';
 
 const CATEGORY_COLORS: { [key: string]: { bg: string; text: string } } = {
   Food: { bg: 'bg-orange-50', text: 'text-orange-600' },
@@ -31,7 +34,6 @@ const CATEGORY_COLORS: { [key: string]: { bg: string; text: string } } = {
 
 type SortKey = 'date' | 'category' | 'shareWith' | 'amount';
 
-// --- [공통 컴포넌트: 상태 배지] ---
 function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }) {
   const styles = {
     pending: { bg: 'bg-amber-50', text: 'text-amber-600', icon: Clock, label: 'Pending' },
@@ -43,10 +45,8 @@ function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }
     },
     declined: { bg: 'bg-rose-50', text: 'text-rose-600', icon: XCircle, label: 'Declined' },
   };
-
   const current = styles[status] || styles.pending;
   const Icon = current.icon;
-
   return (
     <div
       className={cn(
@@ -67,10 +67,13 @@ export function TransactionPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedRecipient, setSelectedRecipient] = useState<string>('All');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [isAsc, setIsAsc] = useState(false);
 
-  // 수신자 표시용 헬퍼 로직
+  // 현재 수정 중인 이메일 값이 '이미 저장된 값'인지 확인하기 위한 상태
+  const [isInitialValueLocked, setIsInitialValueLocked] = useState(false);
+
   const getRecipientDisplay = (tx: any) => {
     if (tx.recipientName) return tx.recipientName;
     if (tx.shareWith) {
@@ -80,29 +83,51 @@ export function TransactionPage() {
     return null;
   };
 
+  const recipientList = useMemo(() => {
+    const names = transactions
+      .map((tx) => getRecipientDisplay(tx))
+      .filter((name): name is string => Boolean(name));
+    return Array.from(new Set(names));
+  }, [transactions]);
+
+  // 수정 모드로 진입할 때만 잠금 여부 판단
   useEffect(() => {
-    if (location.state?.selectedId) {
-      setEditingId(location.state.selectedId);
-      window.history.replaceState({}, document.title);
+    const targetId = location.state?.selectedId || editingId;
+    if (targetId) {
+      const tx = transactions.find((t) => t.id === targetId);
+      // 이메일이 이미 존재한다면 잠금 상태로 시작
+      if (tx?.shareWith && tx.shareWith !== '') {
+        setIsInitialValueLocked(true);
+      } else {
+        setIsInitialValueLocked(false);
+      }
+
+      if (location.state?.selectedId) {
+        setEditingId(location.state.selectedId);
+        window.history.replaceState({}, document.title);
+      }
     }
-  }, [location.state]);
+  }, [editingId, location.state]);
 
   const filteredTransactions = useMemo(() => {
     let result = transactions.filter((tx) => {
+      const name = getRecipientDisplay(tx);
+      const matchRecipient =
+        selectedRecipient === 'All'
+          ? true
+          : selectedRecipient === 'Personal'
+            ? !name
+            : name === selectedRecipient;
       const matchCategory = selectedCategory === 'All' || tx.category === selectedCategory;
-      const matchSearch =
-        tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (tx.shareWith || '').toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCategory && matchSearch;
+      const matchSearch = tx.title.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchRecipient && matchCategory && matchSearch;
     });
 
     return result.sort((a, b) => {
-      let valA: any;
-      let valB: any;
-
+      let valA: any, valB: any;
       if (sortKey === 'shareWith') {
-        valA = (a.recipientName || a.shareWith || 'zzz').toLowerCase();
-        valB = (b.recipientName || b.shareWith || 'zzz').toLowerCase();
+        valA = (getRecipientDisplay(a) || 'zzz').toLowerCase();
+        valB = (getRecipientDisplay(b) || 'zzz').toLowerCase();
       } else if (sortKey === 'date') {
         valA = new Date(a.date).getTime();
         valB = new Date(b.date).getTime();
@@ -110,12 +135,11 @@ export function TransactionPage() {
         valA = a[sortKey] || 0;
         valB = b[sortKey] || 0;
       }
-
       if (valA < valB) return isAsc ? -1 : 1;
       if (valA > valB) return isAsc ? 1 : -1;
       return 0;
     });
-  }, [transactions, searchQuery, selectedCategory, sortKey, isAsc]);
+  }, [transactions, searchQuery, selectedCategory, selectedRecipient, sortKey, isAsc]);
 
   const currentTotal = useMemo(() => {
     return filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0);
@@ -123,7 +147,21 @@ export function TransactionPage() {
 
   const selectedTx = transactions.find((t) => t.id === editingId);
 
-  // --- [1] 리스트 뷰 (모바일 카드 + PC 테이블) ---
+  const handleSendRequest = () => {
+    if (!selectedTx?.shareWith) return;
+    toast.success(`Request sent to ${selectedTx.shareWith}!`, {
+      icon: '🚀',
+      style: {
+        borderRadius: '16px',
+        background: '#0f172a',
+        color: '#fff',
+        fontSize: '12px',
+        fontWeight: 'bold',
+      },
+    });
+    updateTransaction(editingId!, { status: 'pending' });
+  };
+
   if (!editingId) {
     return (
       <div className="relative min-h-screen flex flex-col p-4 md:p-8 space-y-6 animate-in fade-in duration-500">
@@ -153,7 +191,22 @@ export function TransactionPage() {
                 ))}
               </select>
             </div>
-
+            <div className="flex items-center bg-white rounded-xl shadow-sm px-3 py-2 border border-slate-50">
+              <User size={14} className="text-slate-400 mr-2" />
+              <select
+                className="text-xs font-bold text-slate-700 bg-transparent outline-none cursor-pointer"
+                value={selectedRecipient}
+                onChange={(e) => setSelectedRecipient(e.target.value)}
+              >
+                <option value="All">All Recipients</option>
+                <option value="Personal">Personal Only</option>
+                {recipientList.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex items-center bg-white rounded-xl shadow-sm px-3 py-2 border border-slate-50">
               <Filter size={14} className="text-slate-400 mr-2" />
               <select
@@ -163,7 +216,7 @@ export function TransactionPage() {
               >
                 <option value="date">Date</option>
                 <option value="amount">Amount</option>
-                <option value="shareWith">Recipient</option>
+                <option value="shareWith">Recipient Name</option>
               </select>
               <button onClick={() => setIsAsc(!isAsc)} className="ml-2 text-blue-600">
                 <ArrowUpDown
@@ -172,7 +225,6 @@ export function TransactionPage() {
                 />
               </button>
             </div>
-
             <div className="relative flex-grow md:max-w-xs">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -180,7 +232,7 @@ export function TransactionPage() {
               />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder="Search description..."
                 className="w-full bg-white border-none rounded-xl pl-9 pr-3 py-2 text-xs focus:ring-2 focus:ring-blue-600/10 outline-none shadow-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -190,7 +242,6 @@ export function TransactionPage() {
         </div>
 
         <div className="flex-1 pb-24">
-          {/* PC Table View */}
           <div className="hidden md:block bg-white rounded-[2.5rem] border border-slate-50 shadow-sm overflow-hidden overflow-x-auto">
             <table className="min-w-[800px] w-full text-left border-collapse">
               <thead>
@@ -284,7 +335,6 @@ export function TransactionPage() {
     );
   }
 
-  // --- [2] 상세 수정 뷰 (Edit Transaction) ---
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
       <button
@@ -372,6 +422,65 @@ export function TransactionPage() {
             </div>
           </div>
 
+          {/* Recipient Email & Request Section */}
+          <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-100">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Mail size={16} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    Recipient Email
+                  </span>
+                </div>
+                {isInitialValueLocked && (
+                  <button
+                    onClick={() => {
+                      updateTransaction(editingId!, { shareWith: '' });
+                      setIsInitialValueLocked(false);
+                    }}
+                    className="flex items-center gap-1.5 text-[9px] font-black text-rose-500 bg-rose-50 px-2.5 py-1.5 rounded-xl hover:bg-rose-500 hover:text-white transition-all uppercase"
+                  >
+                    <RotateCcw size={10} strokeWidth={3} /> Reset to Edit
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="email"
+                  placeholder="partner@example.com"
+                  readOnly={isInitialValueLocked}
+                  className={cn(
+                    'w-full border-2 rounded-2xl px-5 py-4 text-sm font-bold transition-all outline-none',
+                    isInitialValueLocked
+                      ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed shadow-inner'
+                      : 'bg-white border-white text-slate-900 focus:border-blue-600 shadow-sm',
+                  )}
+                  value={selectedTx?.shareWith || ''}
+                  onChange={(e) => updateTransaction(editingId!, { shareWith: e.target.value })}
+                />
+                {isInitialValueLocked && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    <Lock size={16} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              disabled={!selectedTx?.shareWith}
+              onClick={handleSendRequest}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all',
+                selectedTx?.shareWith
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 hover:bg-slate-900'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed',
+              )}
+            >
+              <Send size={14} strokeWidth={3} /> Send Approval Request
+            </button>
+          </div>
+
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-slate-400">
               <StickyNote size={16} />
@@ -381,13 +490,17 @@ export function TransactionPage() {
               className="w-full bg-slate-50 rounded-2xl p-6 text-sm font-medium outline-none resize-none focus:ring-2 focus:ring-blue-600/5 transition-all"
               rows={4}
               value={selectedTx?.memo || ''}
-              onChange={(e) => updateTransaction(editingId, { memo: e.target.value })}
+              onChange={(e) => updateTransaction(editingId!, { memo: e.target.value })}
               placeholder="Add some details..."
             />
           </div>
 
           <button
-            onClick={() => setEditingId(null)}
+            onClick={() => {
+              setEditingId(null);
+              // 닫을 때 현재 값을 고정함 (다음 번 열었을 때 잠김)
+              if (selectedTx?.shareWith) setIsInitialValueLocked(true);
+            }}
             className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-blue-600 transition-all uppercase tracking-widest text-sm shadow-xl shadow-slate-200"
           >
             <div className="flex items-center justify-center gap-2">

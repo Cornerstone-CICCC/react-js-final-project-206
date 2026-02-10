@@ -15,6 +15,7 @@ export default function Header() {
     },
   ]);
 
+  // 바깥 영역 클릭 시 알림창 닫기
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
@@ -41,9 +42,9 @@ export default function Header() {
   };
 
   return (
-    <header className="flex items-center justify-between w-full mb-8 relative">
+    <header className="flex items-center justify-between w-full pb-4 bg-surface-bg/80 backdrop-blur-md transition-all">
       {/* 1. 검색 영역 (Search Bar) */}
-      <div className="relative w-full max-w-md">
+      <div className="relative w-full max-w-md ml-2">
         <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
           <Search className="h-4 w-4 text-slate-400" />
         </div>
@@ -58,12 +59,14 @@ export default function Header() {
       </div>
 
       {/* 2. 사용자 프로필 및 알림 영역 */}
-      <div className="flex items-center gap-6">
-        {/* 알림 아이콘 & 드롭다운 (숫자 배지 적용) */}
+      <div className="flex items-center gap-6 mr-2">
+        {/* 알림 아이콘 & 드롭다운 */}
         <div className="relative" ref={notificationRef}>
           <button
             onClick={() => setShowNotification(!showNotification)}
-            className={`relative p-2 text-slate-400 hover:bg-white hover:rounded-full transition-all shadow-sm ${showNotification ? 'bg-white rounded-full text-blue-600' : ''}`}
+            className={`relative p-2 text-slate-400 hover:bg-white hover:rounded-full transition-all shadow-sm ${
+              showNotification ? 'bg-white rounded-full text-blue-600' : ''
+            }`}
           >
             <Bell className="h-5 w-5" />
             {/* 숫자 알림 배지 */}
@@ -76,7 +79,7 @@ export default function Header() {
 
           {/* 알림 드롭다운 패널 */}
           {showNotification && (
-            <div className="absolute right-0 mt-4 w-[320px] bg-white rounded-[2rem] shadow-2xl border border-slate-50 overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+            <div className="absolute right-0 mt-4 w-[320px] bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-200 origin-top-right">
               <div className="p-5 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   Notifications

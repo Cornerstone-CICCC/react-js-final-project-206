@@ -15,10 +15,22 @@ import {
 import { useTransactions } from '../context/TransactionContext';
 import AddTransactionModal from '../components/dashboard/AddTransactionModal';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '../lib/utils'; // cn 헬퍼 함수가 있다고 가정합니다.
 
-const COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#1d4ed8', '#1e3a8a'];
+// TransactionPage와 동일한 색상 팔레트 정의
+const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; chart: string } } = {
+  Food: { bg: 'bg-orange-50', text: 'text-orange-600', chart: '#f97316' },
+  Transport: { bg: 'bg-blue-50', text: 'text-blue-600', chart: '#2563eb' },
+  Rent: { bg: 'bg-purple-50', text: 'text-purple-600', chart: '#a855f7' },
+  Household: { bg: 'bg-emerald-50', text: 'text-emerald-600', chart: '#10b981' },
+  Health: { bg: 'bg-rose-50', text: 'text-rose-600', chart: '#f43f5e' },
+  Education: { bg: 'bg-indigo-50', text: 'text-indigo-600', chart: '#6366f1' },
+  Other: { bg: 'bg-slate-50', text: 'text-slate-600', chart: '#64748b' },
+};
 
-// 상태 배지 컴포넌트
+// 기본색 (카테고리가 정의되지 않았을 경우)
+const DEFAULT_COLOR = { bg: 'bg-slate-50', text: 'text-slate-600', chart: '#94a3b8' };
+
 function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }) {
   const styles = {
     pending: { bg: 'bg-amber-50', text: 'text-amber-600', icon: Clock, label: 'Pending' },
@@ -30,9 +42,7 @@ function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }
     },
     declined: { bg: 'bg-rose-50', text: 'text-rose-600', icon: XCircle, label: 'Declined' },
   };
-
   const { bg, text, icon: Icon, label } = styles[status];
-
   return (
     <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${bg} ${text} w-fit mx-auto`}>
       <Icon size={12} />
@@ -46,16 +56,32 @@ export default function Dashboard() {
   const { transactions } = useTransactions();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 차트 데이터 가공: Category
+  // 1. 현재 달 계산 (YYYY-MM 형식)
+  const currentMonthStr = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+
+  // 2. 차트 데이터 가공: 이번 달(Current Month) 카테고리 비율만 계산
   const categoryData = useMemo(() => {
-    const stats = transactions.reduce((acc: any, cur) => {
+    // 이번 달에 해당하는 트랜잭션만 필터링
+    const currentMonthTransactions = transactions.filter((tx) => {
+      // tx.date가 "2024-05-20" 형식이라고 가정할 때 앞의 7글자(YYYY-MM) 비교
+      return tx.date.startsWith(currentMonthStr);
+    });
+
+    const stats = currentMonthTransactions.reduce((acc: any, cur) => {
       acc[cur.category] = (acc[cur.category] || 0) + cur.amount;
       return acc;
     }, {});
-    return Object.keys(stats).map((key) => ({ name: key, value: stats[key] }));
-  }, [transactions]);
 
-  // 차트 데이터 가공: Monthly
+    return Object.keys(stats).map((key) => ({
+      name: key,
+      value: stats[key],
+      color: CATEGORY_COLORS[key]?.chart || DEFAULT_COLOR.chart,
+    }));
+  }, [transactions, currentMonthStr]);
+
   const monthlyData = useMemo(() => {
     const months = [
       'Jan',
@@ -81,7 +107,6 @@ export default function Dashboard() {
 
   const totalSpending = transactions.reduce((acc, cur) => acc + cur.amount, 0);
 
-  // 최신순으로 정렬된 최근 5개 내역
   const recentTransactions = useMemo(() => {
     return [...transactions]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -105,7 +130,6 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
-
         <button
           onClick={() => setIsModalOpen(true)}
           className="bg-slate-900 hover:bg-blue-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 shadow-xl transition-all hover:-translate-y-0.5 active:scale-95"
@@ -133,35 +157,66 @@ export default function Dashboard() {
       {/* 3. Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm">
-          <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">
-            Category Ratio
-          </h3>
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {categoryData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <RechartsTooltip
-                  contentStyle={{
-                    borderRadius: '16px',
-                    border: 'none',
-                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
+              Category Ratio
+            </h3>
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+              {currentMonthStr}
+            </span>
           </div>
+
+          <div className="h-[250px] w-full">
+            {categoryData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip
+                    contentStyle={{
+                      borderRadius: '16px',
+                      border: 'none',
+                      boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                No data for this month
+              </div>
+            )}
+          </div>
+          {categoryData.length > 0 && (
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              {categoryData.map((item) => (
+                <div
+                  key={item.name}
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {/* 카테고리 색상 점 */}
+                    <div
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-[11px] font-bold text-slate-700">{item.name}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm">
@@ -228,46 +283,52 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {recentTransactions.map((tx) => (
-                  <tr
-                    key={tx.id}
-                    className="group hover:bg-slate-50/30 transition-colors cursor-pointer"
-                    onClick={() => navigate('/transaction', { state: { selectedId: tx.id } })} // ID를 state로 전달
-                  >
-                    <td className="px-8 py-5 text-xs font-bold text-slate-400 whitespace-nowrap">
-                      {tx.date}
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-tighter">
-                        {tx.category}
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 font-bold text-slate-900 truncate max-w-[200px]">
-                      {tx.title}
-                    </td>
-                    <td className="px-8 py-5 text-center text-xs font-medium text-slate-500 italic">
-                      {tx.recipientName || tx.shareWith || '-'}
-                    </td>
-                    <td className="px-8 py-5">
-                      <div className="flex justify-center items-center">
+                {recentTransactions.map((tx) => {
+                  const catStyle = CATEGORY_COLORS[tx.category] || DEFAULT_COLOR;
+                  return (
+                    <tr
+                      key={tx.id}
+                      className="group hover:bg-slate-50/30 transition-colors cursor-pointer"
+                      onClick={() => navigate('/transaction', { state: { selectedId: tx.id } })}
+                    >
+                      <td className="px-8 py-5 text-xs font-bold text-slate-400 whitespace-nowrap">
+                        {tx.date}
+                      </td>
+                      <td className="px-8 py-5">
+                        <span
+                          className={cn(
+                            'text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-tighter',
+                            catStyle.bg,
+                            catStyle.text,
+                          )}
+                        >
+                          {tx.category}
+                        </span>
+                      </td>
+                      <td className="px-8 py-5 font-bold text-slate-900 truncate max-w-[200px]">
+                        {tx.title}
+                      </td>
+                      <td className="px-8 py-5 text-center text-xs font-medium text-slate-500 italic">
+                        {tx.recipientName || tx.shareWith || '-'}
+                      </td>
+                      <td className="px-8 py-5 text-center">
                         {tx.shareWith ? (
                           <StatusBadge status={tx.status || 'pending'} />
                         ) : (
-                          <span className="text-slate-300 text-sm font-bold">-</span>
+                          <span className="text-slate-300">-</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-right font-black text-slate-900">
-                      -${tx.amount.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-8 py-5 text-right font-black text-slate-900">
+                        -${tx.amount.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       </div>
-
       <AddTransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
