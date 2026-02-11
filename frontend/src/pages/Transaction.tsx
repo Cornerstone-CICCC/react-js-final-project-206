@@ -498,8 +498,18 @@ export function TransactionPage() {
           <button
             onClick={() => {
               setEditingId(null);
-              // 닫을 때 현재 값을 고정함 (다음 번 열었을 때 잠김)
+
               if (selectedTx?.shareWith) setIsInitialValueLocked(true);
+
+              toast.success('Transaction updated!', {
+                style: {
+                  borderRadius: '12px',
+                  background: '#0f172a',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                },
+              });
             }}
             className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-blue-600 transition-all uppercase tracking-widest text-sm shadow-xl shadow-slate-200"
           >

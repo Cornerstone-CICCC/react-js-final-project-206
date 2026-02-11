@@ -1,5 +1,15 @@
 import { useState, useMemo } from 'react';
-import { Plus, TrendingUp, Clock, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import {
+  Plus,
+  TrendingUp,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
+  Award,
+} from 'lucide-react';
 import {
   PieChart,
   Pie,
@@ -15,9 +25,8 @@ import {
 import { useTransactions } from '../context/TransactionContext';
 import AddTransactionModal from '../components/dashboard/AddTransactionModal';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '../lib/utils'; // cn 헬퍼 함수가 있다고 가정합니다.
+import { cn } from '../lib/utils';
 
-// TransactionPage와 동일한 색상 팔레트 정의
 const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; chart: string } } = {
   Food: { bg: 'bg-orange-50', text: 'text-orange-600', chart: '#f97316' },
   Transport: { bg: 'bg-blue-50', text: 'text-blue-600', chart: '#2563eb' },
@@ -28,7 +37,6 @@ const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; chart: strin
   Other: { bg: 'bg-slate-50', text: 'text-slate-600', chart: '#64748b' },
 };
 
-// 기본색 (카테고리가 정의되지 않았을 경우)
 const DEFAULT_COLOR = { bg: 'bg-slate-50', text: 'text-slate-600', chart: '#94a3b8' };
 
 function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }) {
@@ -56,20 +64,59 @@ export default function Dashboard() {
   const { transactions } = useTransactions();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 1. 현재 달 계산 (YYYY-MM 형식)
   const currentMonthStr = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
-  // 2. 차트 데이터 가공: 이번 달(Current Month) 카테고리 비율만 계산
-  const categoryData = useMemo(() => {
-    // 이번 달에 해당하는 트랜잭션만 필터링
-    const currentMonthTransactions = transactions.filter((tx) => {
-      // tx.date가 "2024-05-20" 형식이라고 가정할 때 앞의 7글자(YYYY-MM) 비교
-      return tx.date.startsWith(currentMonthStr);
+  // [핵심 추가] 지난달과 이번 달 상세 비교 로직
+  const comparisonStats = useMemo(() => {
+    const now = new Date();
+    const curMonth = now.getMonth();
+    const curYear = now.getFullYear();
+
+    const lastMonth = curMonth === 0 ? 11 : curMonth - 1;
+    const lastMonthYear = curMonth === 0 ? curYear - 1 : curYear;
+
+    const thisMonthTransactions = transactions.filter((tx) => {
+      const d = new Date(tx.date);
+      return d.getMonth() === curMonth && d.getFullYear() === curYear;
     });
 
+    const lastMonthTransactions = transactions.filter((tx) => {
+      const d = new Date(tx.date);
+      return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear;
+    });
+
+    const thisTotal = thisMonthTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    const lastTotal = lastMonthTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+    const diff = thisTotal - lastTotal;
+    const percent = lastTotal === 0 ? 0 : (diff / lastTotal) * 100;
+
+    // 이번 달 가장 많이 쓴 카테고리 추출
+    const catStats = thisMonthTransactions.reduce((acc: any, cur) => {
+      acc[cur.category] = (acc[cur.category] || 0) + cur.amount;
+      return acc;
+    }, {});
+
+    const topCategory =
+      Object.keys(catStats).sort((a, b) => catStats[b] - catStats[a])[0] || 'None';
+
+    return {
+      thisTotal,
+      lastTotal,
+      diff,
+      percent: Math.abs(percent).toFixed(1),
+      isIncreased: diff > 0,
+      topCategory,
+    };
+  }, [transactions]);
+
+  const categoryData = useMemo(() => {
+    const currentMonthTransactions = transactions.filter((tx) =>
+      tx.date.startsWith(currentMonthStr),
+    );
     const stats = currentMonthTransactions.reduce((acc: any, cur) => {
       acc[cur.category] = (acc[cur.category] || 0) + cur.amount;
       return acc;
@@ -105,8 +152,6 @@ export default function Dashboard() {
     });
   }, [transactions]);
 
-  const totalSpending = transactions.reduce((acc, cur) => acc + cur.amount, 0);
-
   const recentTransactions = useMemo(() => {
     return [...transactions]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -118,7 +163,7 @@ export default function Dashboard() {
       {/* 1. Header */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2 px-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-200">
             <TrendingUp className="text-white w-5 h-5" />
           </div>
           <div>
@@ -139,17 +184,92 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* 2. Summary Card */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm">
+      {/* 2. Summary & Analysis Section (상세 분석 리포트 추가) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Monthly Spending Card */}
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm flex flex-col justify-center">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 font-mono">
             Monthly Spending
           </p>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">
-              ${totalSpending.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            <span className="text-4xl font-black text-slate-900">
+              ${comparisonStats.thisTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
             <span className="text-blue-600 text-[10px] font-black tracking-widest">CAD</span>
+          </div>
+        </div>
+
+        {/* [NEW] 상세 분석 리포트 카드 */}
+        <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-900/20">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center h-full">
+            <div>
+              <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-3">
+                AI Monthly Analysis
+              </p>
+              <h3 className="text-xl font-bold leading-tight mb-4">
+                {comparisonStats.isIncreased ? (
+                  <>
+                    You spent{' '}
+                    <span className="text-rose-400 font-black">
+                      ${Math.abs(comparisonStats.diff).toLocaleString()}
+                    </span>{' '}
+                    more
+                    <br />
+                    than last month.
+                  </>
+                ) : (
+                  <>
+                    You saved{' '}
+                    <span className="text-emerald-400 font-black">
+                      ${Math.abs(comparisonStats.diff).toLocaleString()}
+                    </span>
+                    <br />
+                    compared to last month!
+                  </>
+                )}
+              </h3>
+              <div className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/10 w-fit">
+                <Award size={18} className="text-blue-400" />
+                <span className="text-[11px] font-bold">
+                  Top Category: <span className="text-blue-400">{comparisonStats.topCategory}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center md:items-end justify-center gap-2">
+              <div
+                className={cn(
+                  'px-6 py-4 rounded-[2rem] flex flex-col items-center justify-center min-w-[120px] shadow-2xl',
+                  comparisonStats.isIncreased
+                    ? 'bg-rose-500/10 border border-rose-500/20'
+                    : 'bg-emerald-500/10 border border-emerald-500/20',
+                )}
+              >
+                <div className="flex items-center gap-1">
+                  {comparisonStats.isIncreased ? (
+                    <ArrowUpRight className="text-rose-400" size={20} />
+                  ) : (
+                    <ArrowDownRight className="text-emerald-400" size={20} />
+                  )}
+                  <span
+                    className={cn(
+                      'text-3xl font-black',
+                      comparisonStats.isIncreased ? 'text-rose-400' : 'text-emerald-400',
+                    )}
+                  >
+                    {comparisonStats.percent}%
+                  </span>
+                </div>
+                <span className="text-[9px] font-black uppercase opacity-40 mt-1 tracking-tighter">
+                  Vs Last Month
+                </span>
+              </div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase mt-2">
+                Last Mo: ${comparisonStats.lastTotal.toLocaleString()}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -161,11 +281,10 @@ export default function Dashboard() {
             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
               Category Ratio
             </h3>
-            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">
               {currentMonthStr}
             </span>
           </div>
-
           <div className="h-[250px] w-full">
             {categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -174,9 +293,9 @@ export default function Dashboard() {
                     data={categoryData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
+                    innerRadius={70}
+                    outerRadius={90}
+                    paddingAngle={8}
                     dataKey="value"
                   >
                     {categoryData.map((entry, index) => (
@@ -185,38 +304,32 @@ export default function Dashboard() {
                   </Pie>
                   <RechartsTooltip
                     contentStyle={{
-                      borderRadius: '16px',
+                      borderRadius: '20px',
                       border: 'none',
-                      boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                      boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
                     }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+              <div className="h-full flex items-center justify-center text-slate-300 text-xs font-black uppercase tracking-widest">
                 No data for this month
               </div>
             )}
           </div>
-          {categoryData.length > 0 && (
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              {categoryData.map((item) => (
-                <div
-                  key={item.name}
-                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    {/* 카테고리 색상 점 */}
-                    <div
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-[11px] font-bold text-slate-700">{item.name}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="mt-6 flex flex-wrap gap-2 justify-center">
+            {categoryData.map((item) => (
+              <div
+                key={item.name}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100"
+              >
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">
+                  {item.name}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm">
@@ -226,19 +339,19 @@ export default function Dashboard() {
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
                 <XAxis
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }}
+                  tick={{ fontSize: 10, fontWeight: 800, fill: '#cbd5e1' }}
                 />
                 <YAxis hide />
                 <RechartsTooltip
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '16px', border: 'none' }}
                 />
-                <Bar dataKey="amount" fill="#2563eb" radius={[6, 6, 0, 0]} barSize={18} />
+                <Bar dataKey="amount" fill="#2563eb" radius={[8, 8, 0, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -248,36 +361,37 @@ export default function Dashboard() {
       {/* 4. Transaction History */}
       <div className="space-y-6">
         <div className="flex justify-between items-center px-2">
-          <h3 className="text-lg font-black text-slate-900">Transaction History</h3>
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">Recent Activity</h3>
           <button
             onClick={() => navigate('/transaction')}
-            className="flex items-center gap-2 text-blue-600 font-bold text-sm hover:gap-3 transition-all"
+            className="flex items-center gap-2 text-blue-600 font-black text-[11px] uppercase tracking-widest hover:gap-3 transition-all"
           >
-            View All <ArrowRight size={16} />
+            View All Transactions <ArrowRight size={16} />
           </button>
         </div>
 
         <div className="bg-white rounded-[2.5rem] border border-slate-50 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full table-auto text-left border-collapse">
+            <table className="min-w-full text-left">
               <thead>
                 <tr className="bg-slate-50/50">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Date
                   </th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Category
                   </th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Description
                   </th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                  {/* Recipient 열 추가 */}
+                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Recipient
                   </th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Status
                   </th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
+                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
                     Amount
                   </th>
                 </tr>
@@ -288,16 +402,14 @@ export default function Dashboard() {
                   return (
                     <tr
                       key={tx.id}
-                      className="group hover:bg-slate-50/30 transition-colors cursor-pointer"
+                      className="group hover:bg-slate-50/50 transition-all cursor-pointer"
                       onClick={() => navigate('/transaction', { state: { selectedId: tx.id } })}
                     >
-                      <td className="px-8 py-5 text-xs font-bold text-slate-400 whitespace-nowrap">
-                        {tx.date}
-                      </td>
+                      <td className="px-8 py-5 text-xs font-bold text-slate-400">{tx.date}</td>
                       <td className="px-8 py-5">
                         <span
                           className={cn(
-                            'text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-tighter',
+                            'text-[9px] font-black px-2.5 py-1 rounded-lg uppercase',
                             catStyle.bg,
                             catStyle.text,
                           )}
@@ -305,19 +417,26 @@ export default function Dashboard() {
                           {tx.category}
                         </span>
                       </td>
-                      <td className="px-8 py-5 font-bold text-slate-900 truncate max-w-[200px]">
-                        {tx.title}
+                      <td className="px-8 py-5 font-bold text-slate-900">{tx.title}</td>
+
+                      {/* 1. Recipient 데이터 표시 (이름/이메일) */}
+                      <td className="px-8 py-5 text-center text-[11px] font-bold text-slate-500 italic">
+                        {tx.recipientName || tx.shareWith || (
+                          <span className="text-slate-200 not-italic">-</span>
+                        )}
                       </td>
-                      <td className="px-8 py-5 text-center text-xs font-medium text-slate-500 italic">
-                        {tx.recipientName || tx.shareWith || '-'}
-                      </td>
+
+                      {/* 2. Status 배지 표시 */}
                       <td className="px-8 py-5 text-center">
                         {tx.shareWith ? (
                           <StatusBadge status={tx.status || 'pending'} />
                         ) : (
-                          <span className="text-slate-300">-</span>
+                          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                            -
+                          </span>
                         )}
                       </td>
+
                       <td className="px-8 py-5 text-right font-black text-slate-900">
                         -${tx.amount.toFixed(2)}
                       </td>
