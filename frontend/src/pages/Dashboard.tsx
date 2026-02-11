@@ -64,7 +64,6 @@ export default function Dashboard() {
   const { transactions } = useTransactions();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-<<<<<<< HEAD
   const currentMonthStr = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -97,11 +96,6 @@ export default function Dashboard() {
 
     // 이번 달 가장 많이 쓴 카테고리 추출
     const catStats = thisMonthTransactions.reduce((acc: any, cur) => {
-=======
-  // 차트 데이터 가공: Category
-  const categoryData = useMemo(() => {
-    const stats = transactions.reduce((acc: Record<string, number>, cur) => {
->>>>>>> origin/frontend-jiae
       acc[cur.category] = (acc[cur.category] || 0) + cur.amount;
       return acc;
     }, {});
@@ -158,15 +152,6 @@ export default function Dashboard() {
     });
   }, [transactions]);
 
-<<<<<<< HEAD
-=======
-  const totalSpending = useMemo(
-    () => transactions.reduce((acc, cur) => acc + cur.amount, 0),
-    [transactions],
-  );
-
-  // 최신순으로 정렬된 최근 5개 내역
->>>>>>> origin/frontend-jiae
   const recentTransactions = useMemo(() => {
     return [...transactions]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -412,7 +397,6 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-<<<<<<< HEAD
                 {recentTransactions.map((tx) => {
                   const catStyle = CATEGORY_COLORS[tx.category] || DEFAULT_COLOR;
                   return (
@@ -444,30 +428,6 @@ export default function Dashboard() {
 
                       {/* 2. Status 배지 표시 */}
                       <td className="px-8 py-5 text-center">
-=======
-                {recentTransactions.map((tx) => (
-                  <tr
-                    key={tx.id}
-                    className="group hover:bg-slate-50/30 transition-colors cursor-pointer"
-                    onClick={() => navigate('/transaction', { state: { selectedId: tx.id } })}
-                  >
-                    <td className="px-8 py-5 text-xs font-bold text-slate-400 whitespace-nowrap">
-                      {tx.date}
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-tighter">
-                        {tx.category}
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 font-bold text-slate-900 truncate max-w-[200px]">
-                      {tx.title}
-                    </td>
-                    <td className="px-8 py-5 text-center text-xs font-medium text-slate-500 italic">
-                      {tx.recipientName || tx.shareWith || '-'}
-                    </td>
-                    <td className="px-8 py-5">
-                      <div className="flex justify-center items-center">
->>>>>>> origin/frontend-jiae
                         {tx.shareWith ? (
                           <StatusBadge status={tx.status || 'pending'} />
                         ) : (
