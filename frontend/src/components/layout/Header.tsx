@@ -1,13 +1,30 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Mic, Bell, Mail, Check, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTransactions } from '../../context/TransactionContext'; // Context 연결
+import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
 
 export default function Header() {
   const { addTransaction } = useTransactions();
+  const { auth } = useAuth();
+
   const [showNotification, setShowNotification] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  // ✅ 우상단 표시용 이름 (실제 로그인 유저 기반)
+  const displayName = useMemo(() => {
+    const first = auth.user?.firstName?.trim();
+    const last = auth.user?.lastName?.trim();
+    const full = [first, last].filter(Boolean).join(' ').trim();
+    return full || auth.user?.email || 'User';
+  }, [auth.user?.firstName, auth.user?.lastName, auth.user?.email]);
+
+  const subtitle = useMemo(() => {
+    // 원래 디자인 톤 유지: "HELLO, ADMIN" 같은 느낌을 유지하되, role 없으니 기본 "HELLO"
+    // (원하면 email 기반으로 더 자연스럽게 바꿔줄 수도 있음)
+    return 'HELLO';
+  }, []);
 
   // 1. 대기 중인 요청 데이터 (카테고리 및 날짜 정보 포함)
   const [pendingRequests, setPendingRequests] = useState([
@@ -171,10 +188,10 @@ export default function Header() {
         <Link to="/profile" className="flex items-center gap-3 group">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-black text-slate-900 leading-none group-hover:text-blue-600 transition-colors tracking-tight">
-              Trinh Phuong
+              {displayName}
             </p>
             <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest opacity-70">
-              Hello, Admin
+              {subtitle}
             </p>
           </div>
           <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border-2 border-white shadow-sm cursor-pointer group-hover:ring-4 group-hover:ring-blue-50 transition-all">
