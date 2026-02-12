@@ -11,6 +11,7 @@ import { TransactionPage } from "./pages/Transaction";
 import Profile from "./pages/Profile";
 
 import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 function App() {
   return (
@@ -24,12 +25,14 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
 
-            {/* Layout */}
+            {/* Protected Layout */}
             <Route
               element={
-                <MainLayout>
-                  <Outlet />
-                </MainLayout>
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Outlet />
+                  </MainLayout>
+                </ProtectedRoute>
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />

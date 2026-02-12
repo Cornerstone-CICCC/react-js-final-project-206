@@ -9,7 +9,7 @@ import { useAuth } from "../context/AuthContext";
 type LoginFormState = {
   email: string;
   password: string;
-  remember: boolean; // UI 유지용(세션에선 의미 없음, 남겨둬도 OK)
+  remember: boolean;
 };
 
 type LoginBackendResponse = {
@@ -22,7 +22,6 @@ type LoginBackendResponse = {
   };
 };
 
-// ✅ 반응형: 모바일만 판별 (요청대로 모바일에서 left 숨김)
 function useIsMobile(breakpoint = 640) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
 
@@ -51,6 +50,9 @@ export default function Login() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ✅ password show/hide
+  const [showPassword, setShowPassword] = useState(false);
+
   const canSubmit = useMemo(() => {
     const emailOk = form.email.trim().length > 0;
     const passwordOk = form.password.trim().length > 0;
@@ -76,10 +78,7 @@ export default function Login() {
   };
 
   const safeRedirectAfterLogin = () => {
-    const from = (location.state as any)?.from as string | undefined;
-    const blocked = ["/login", "/signup", "/invite"];
-    const safeFrom = from && !blocked.includes(from) ? from : undefined;
-    navigate(safeFrom ?? "/dashboard", { replace: true });
+    navigate("/dashboard", { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,7 +116,6 @@ export default function Login() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        {/* ✅ 모바일에서는 left 섹션 자체를 렌더링하지 않음 */}
         {!isMobile && (
           <aside style={styles.left}>
             <div style={{ width: "100%" }}>
@@ -127,9 +125,7 @@ export default function Login() {
 
               <ul style={styles.featureList}>
                 <li style={styles.featureItem}>
-                  <span style={styles.iconCircle} aria-hidden>
-                    📊
-                  </span>
+                  <span style={styles.iconCircle}>📊</span>
                   <div>
                     <div style={styles.featureTitle}>Real-time Analytics</div>
                     <div style={styles.featureDesc}>
@@ -139,9 +135,7 @@ export default function Login() {
                 </li>
 
                 <li style={styles.featureItem}>
-                  <span style={styles.iconCircle} aria-hidden>
-                    🔒
-                  </span>
+                  <span style={styles.iconCircle}>🔒</span>
                   <div>
                     <div style={styles.featureTitle}>Secure &amp; Private</div>
                     <div style={styles.featureDesc}>
@@ -151,9 +145,7 @@ export default function Login() {
                 </li>
 
                 <li style={styles.featureItem}>
-                  <span style={styles.iconCircle} aria-hidden>
-                    ⚡
-                  </span>
+                  <span style={styles.iconCircle}>⚡</span>
                   <div>
                     <div style={styles.featureTitle}>Smart Automation</div>
                     <div style={styles.featureDesc}>
@@ -169,7 +161,7 @@ export default function Login() {
         <main style={styles.right}>
           <div style={styles.formWrap}>
             <h2 style={styles.title}>Welcome back</h2>
-            <p style={styles.subtitle}>Sign in to your account to continue</p>
+            <p style={styles.subtitle}>Log in to your account to continue</p>
 
             <form onSubmit={handleSubmit} style={{ width: "100%" }}>
               <label style={styles.label}>
@@ -188,16 +180,25 @@ export default function Login() {
 
               <label style={styles.label}>
                 Password
-                <input
-                  style={styles.input}
-                  type="password"
-                  name="password"
-                  value={form.password}
-                  onChange={handleChange}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  required
-                />
+                <div style={styles.pwWrap}>
+                  <input
+                    style={styles.pwInput}
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={form.password}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    style={styles.pwToggle}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
               </label>
 
               <div style={styles.rowBetween}>
@@ -211,12 +212,10 @@ export default function Login() {
                   />
                   Remember me
                 </label>
-
-                {/* ✅ 삭제: Forgot password? (백엔드 지원 없어서 혼란 방지) */}
               </div>
 
               <button type="submit" style={styles.primaryBtn} disabled={!canSubmit}>
-                {isSubmitting ? "Signing In..." : "Sign In"}
+                {isSubmitting ? "Logging In..." : "Log In"}
               </button>
 
               <div style={styles.orWrap}>
@@ -255,9 +254,9 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       display: "grid",
       placeItems: "center",
       padding: isMobile ? 14 : 24,
-      background: "#0F1115", // ✅ 배경 통일
+      background: "#0F1115",
       fontFamily:
-        'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"',
+        'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
     },
 
     card: {
@@ -266,7 +265,6 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       borderRadius: isMobile ? 16 : 14,
       overflow: "hidden",
       display: "grid",
-      // ✅ 모바일이면 right만 나오니 단일 컬럼
       gridTemplateColumns: isMobile ? "1fr" : "1.05fr 1fr",
       background: "#ffffff",
       boxShadow: "0 18px 40px rgba(10, 20, 40, 0.12)",
@@ -280,7 +278,7 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       alignItems: "center",
     },
 
-    brand: { margin: 0, fontSize: "34px", letterSpacing: "-0.5px", fontWeight: 800 },
+    brand: { margin: 0, fontSize: "34px", fontWeight: 800 },
     tagline: { margin: "10px 0 0", fontSize: "14px", opacity: 0.9 },
 
     divider: {
@@ -305,15 +303,12 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       display: "grid",
       placeItems: "center",
       background: "rgba(255,255,255,0.16)",
-      border: "1px solid rgba(255,255,255,0.16)",
-      boxShadow: "0 10px 22px rgba(0,0,0,0.12)",
       fontSize: "18px",
     },
     featureTitle: { fontWeight: 700, marginBottom: "6px", fontSize: "14px" },
-    featureDesc: { fontSize: "12px", lineHeight: 1.45, opacity: 0.88, maxWidth: "360px" },
+    featureDesc: { fontSize: "12px", lineHeight: 1.45, opacity: 0.88 },
 
     right: {
-      // ✅ 모바일에서 폼이 꽉 차고 보기 좋게 padding/정렬 조정
       padding: isMobile ? "26px 18px" : "48px 44px",
       display: "flex",
       alignItems: "center",
@@ -328,13 +323,7 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       alignItems: "flex-start",
     },
 
-    title: {
-      margin: 0,
-      fontSize: isMobile ? "26px" : "30px",
-      fontWeight: 800,
-      letterSpacing: "-0.3px",
-      color: "#0f172a",
-    },
+    title: { margin: 0, fontSize: isMobile ? "26px" : "30px", fontWeight: 800 },
 
     subtitle: { margin: "10px 0 24px", fontSize: "13px", color: "#64748b" },
 
@@ -361,6 +350,39 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       boxSizing: "border-box",
     },
 
+    // ✅ password toggle styles
+    pwWrap: {
+      position: "relative",
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+    },
+
+    pwInput: {
+      width: "100%",
+      height: "44px",
+      borderRadius: "10px",
+      border: "1px solid #e5e7eb",
+      background: "#f8fafc",
+      padding: "0 72px 0 14px",
+      fontSize: "14px",
+      outline: "none",
+      boxSizing: "border-box",
+    },
+
+    pwToggle: {
+      position: "absolute",
+      right: 10,
+      height: 30,
+      padding: "0 10px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb",
+      background: "#ffffff",
+      fontWeight: 800,
+      fontSize: 12,
+      cursor: "pointer",
+    },
+
     rowBetween: {
       width: "100%",
       display: "flex",
@@ -369,7 +391,6 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       gap: "12px",
       marginTop: "4px",
       marginBottom: "18px",
-      flexWrap: isMobile ? "wrap" : "nowrap",
     },
 
     checkboxLabel: {
@@ -380,9 +401,8 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       color: "#475569",
       fontWeight: 600,
     },
-    checkbox: { width: "14px", height: "14px" },
 
-    linkSmall: { fontSize: "12px", color: "#1f6bff", textDecoration: "none", fontWeight: 700 },
+    checkbox: { width: "14px", height: "14px" },
 
     primaryBtn: {
       width: "100%",
@@ -393,7 +413,6 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       color: "#ffffff",
       fontWeight: 800,
       cursor: "pointer",
-      boxShadow: "0 12px 26px rgba(31,107,255,0.25)",
     },
 
     secondaryLink: {

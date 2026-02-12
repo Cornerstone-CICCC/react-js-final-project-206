@@ -59,6 +59,10 @@ export default function Signup() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ✅ password show/hide
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const strength = useMemo(() => zxcvbn(form.password), [form.password]);
 
   const validation = useMemo(() => {
@@ -207,16 +211,26 @@ export default function Signup() {
 
           <label style={styles.label}>
             Password
-            <input
-              style={styles.input}
-              type="password"
-              name="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              required
-            />
+            <div style={styles.pwWrap}>
+              <input
+                style={styles.pwInput}
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={styles.pwToggle}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </label>
 
           <div style={styles.strengthWrap} aria-live="polite">
@@ -247,16 +261,26 @@ export default function Signup() {
 
           <label style={styles.label}>
             Confirm password
-            <input
-              style={styles.input}
-              type="password"
-              name="confirmPassword"
-              value={form.confirmPassword}
-              onChange={handleChange}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              required
-            />
+            <div style={styles.pwWrap}>
+              <input
+                style={styles.pwInput}
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                style={styles.pwToggle}
+                aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+              >
+                {showConfirmPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </label>
 
           {!validation.matchOk && form.confirmPassword.length > 0 && (
@@ -347,6 +371,40 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       fontSize: 14,
       outline: "none",
       boxSizing: "border-box",
+    },
+
+    // ✅ password toggle UI
+    pwWrap: {
+      position: "relative",
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+    },
+
+    pwInput: {
+      width: "100%",
+      height: 44,
+      borderRadius: 10,
+      border: "1px solid #e5e7eb",
+      background: "#f8fafc",
+      padding: "0 72px 0 14px",
+      fontSize: 14,
+      outline: "none",
+      boxSizing: "border-box",
+    },
+
+    pwToggle: {
+      position: "absolute",
+      right: 10,
+      height: 30,
+      padding: "0 10px",
+      borderRadius: 8,
+      border: "1px solid #e5e7eb",
+      background: "#ffffff",
+      fontWeight: 900,
+      fontSize: 12,
+      color: "#475569",
+      cursor: "pointer",
     },
 
     strengthWrap: {

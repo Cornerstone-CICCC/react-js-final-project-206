@@ -44,6 +44,14 @@ export default function Profile() {
 
   const [savingPw, setSavingPw] = useState(false);
 
+  // ✅ Personal info edit
+  const [savingInfo, setSavingInfo] = useState(false);
+
+  // ✅ Password visibility toggles
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+
   // ✅ Delete account
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -78,6 +86,50 @@ export default function Profile() {
       email: me.email || auth.user?.email || "",
     };
   }, [me, auth.user?.email]);
+
+  const onInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setMe((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const validateInfo = () => {
+    if (!me.firstName.trim()) return "First name is required.";
+    if (!me.lastName.trim()) return "Last name is required.";
+    if (!me.email.trim()) return "Email is required.";
+    const emailOk = /^\S+@\S+\.\S+$/.test(me.email.trim());
+    if (!emailOk) return "Please enter a valid email address.";
+    return null;
+  };
+
+  // ✅ Update personal info
+  const handleSaveInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!auth.isAuthenticated) return toast.error("You must be logged in.");
+    const err = validateInfo();
+    if (err) return toast.error(err);
+
+    try {
+      setSavingInfo(true);
+
+      const { data } = await api.put("/users/profile", {
+        firstName: me.firstName.trim(),
+        lastName: me.lastName.trim(),
+        email: me.email.trim(),
+      });
+
+      toast.success(data?.message ?? "Profile updated successfully!");
+      await refreshAuth();
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.message ??
+        (error?.response?.status === 401 ? "Not logged in!" : null) ??
+        "Failed to update profile.";
+      toast.error(msg);
+    } finally {
+      setSavingInfo(false);
+    }
+  };
 
   const onPwChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -149,7 +201,7 @@ export default function Profile() {
       setDeleteConfirm("");
 
       await refreshAuth();
-      navigate("/login", { replace: true }); // ✅ 탈퇴 후 로그인 페이지로
+      navigate("/login", { replace: true });
     } catch (error: any) {
       const msg =
         error?.response?.data?.message ??
@@ -206,6 +258,7 @@ export default function Profile() {
     );
   };
 
+  const canSaveInfo = auth.isAuthenticated && !loadingMe && !savingInfo;
   const canDelete =
     auth.isAuthenticated &&
     !loadingMe &&
@@ -223,24 +276,31 @@ export default function Profile() {
         </p>
       </div>
 
-      {/* ---------- Personal Info (Read only) ---------- */}
+      {/* ---------- Personal Info (Editable) ---------- */}
       <section className="bg-white rounded-[2.5rem] border border-slate-50 shadow-sm p-8">
-        <h2 className="text-lg font-black text-slate-900 mb-6">Personal Info</h2>
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-lg font-black text-slate-900">Personal Info</h2>
+            <p className="text-sm text-slate-500 mt-1">Edit your name and email.</p>
+          </div>
+        </div>
 
         {!auth.isAuthenticated ? (
           <div className="text-sm text-slate-500">Not logged in.</div>
         ) : loadingMe ? (
           <div className="text-sm text-slate-500">Loading...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <form onSubmit={handleSaveInfo} className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <label className="space-y-2">
               <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
                 First name
               </span>
               <input
-                className="w-full h-12 rounded-xl border border-slate-200 bg-slate-100 px-4 font-semibold text-slate-500"
-                value={profile.firstName}
-                disabled
+                className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
+                name="firstName"
+                value={me.firstName}
+                onChange={onInfoChange}
+                disabled={!auth.isAuthenticated}
               />
             </label>
 
@@ -249,9 +309,11 @@ export default function Profile() {
                 Last name
               </span>
               <input
-                className="w-full h-12 rounded-xl border border-slate-200 bg-slate-100 px-4 font-semibold text-slate-500"
-                value={profile.lastName}
-                disabled
+                className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
+                name="lastName"
+                value={me.lastName}
+                onChange={onInfoChange}
+                disabled={!auth.isAuthenticated}
               />
             </label>
 
@@ -260,12 +322,25 @@ export default function Profile() {
                 Email
               </span>
               <input
-                className="w-full h-12 rounded-xl border border-slate-200 bg-slate-100 px-4 font-semibold text-slate-500"
-                value={profile.email}
-                disabled
+                className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
+                name="email"
+                type="email"
+                value={me.email}
+                onChange={onInfoChange}
+                disabled={!auth.isAuthenticated}
               />
             </label>
-          </div>
+
+            <div className="md:col-span-2 flex justify-end">
+              <button
+                type="submit"
+                disabled={!canSaveInfo}
+                className="bg-slate-900 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-xl transition-all active:scale-95 disabled:opacity-60"
+              >
+                {savingInfo ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </form>
         )}
       </section>
 
@@ -279,46 +354,76 @@ export default function Profile() {
             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
               Current password
             </span>
-            <input
-              className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
-              name="currentPassword"
-              type="password"
-              value={pw.currentPassword}
-              onChange={onPwChange}
-              required
-              disabled={!auth.isAuthenticated}
-            />
+            <div className="relative">
+              <input
+                className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 pr-24 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
+                name="currentPassword"
+                type={showCurrentPw ? "text" : "password"}
+                value={pw.currentPassword}
+                onChange={onPwChange}
+                required
+                disabled={!auth.isAuthenticated}
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPw((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg bg-slate-100 text-slate-600 font-black text-[11px] hover:bg-slate-200 transition"
+                disabled={!auth.isAuthenticated}
+              >
+                {showCurrentPw ? "Hide" : "Show"}
+              </button>
+            </div>
           </label>
 
           <label className="space-y-2">
             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
               New password
             </span>
-            <input
-              className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
-              name="newPassword"
-              type="password"
-              value={pw.newPassword}
-              onChange={onPwChange}
-              placeholder="Min 8 characters"
-              required
-              disabled={!auth.isAuthenticated}
-            />
+            <div className="relative">
+              <input
+                className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 pr-24 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
+                name="newPassword"
+                type={showNewPw ? "text" : "password"}
+                value={pw.newPassword}
+                onChange={onPwChange}
+                placeholder="Min 8 characters"
+                required
+                disabled={!auth.isAuthenticated}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPw((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg bg-slate-100 text-slate-600 font-black text-[11px] hover:bg-slate-200 transition"
+                disabled={!auth.isAuthenticated}
+              >
+                {showNewPw ? "Hide" : "Show"}
+              </button>
+            </div>
           </label>
 
           <label className="space-y-2">
             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
               Confirm new password
             </span>
-            <input
-              className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
-              name="confirmNewPassword"
-              type="password"
-              value={pw.confirmNewPassword}
-              onChange={onPwChange}
-              required
-              disabled={!auth.isAuthenticated}
-            />
+            <div className="relative">
+              <input
+                className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 pr-24 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
+                name="confirmNewPassword"
+                type={showConfirmPw ? "text" : "password"}
+                value={pw.confirmNewPassword}
+                onChange={onPwChange}
+                required
+                disabled={!auth.isAuthenticated}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPw((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg bg-slate-100 text-slate-600 font-black text-[11px] hover:bg-slate-200 transition"
+                disabled={!auth.isAuthenticated}
+              >
+                {showConfirmPw ? "Hide" : "Show"}
+              </button>
+            </div>
           </label>
 
           <div className="md:col-span-2 flex justify-end">
