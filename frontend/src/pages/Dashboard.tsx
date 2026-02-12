@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Plus,
   TrendingUp,
@@ -9,6 +9,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Award,
+  Bell,
+  Check,
+  X,
 } from 'lucide-react';
 import {
   PieChart,
@@ -26,6 +29,9 @@ import { useTransactions } from '../context/TransactionContext';
 import AddTransactionModal from '../components/dashboard/AddTransactionModal';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import api from '../lib/api'; // Axios 인스턴스
+import { socket } from '../lib/socket';
+import toast from 'react-hot-toast';
 
 const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; chart: string } } = {
   Food: { bg: 'bg-orange-50', text: 'text-orange-600', chart: '#f97316' },
@@ -39,7 +45,7 @@ const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; chart: strin
 
 const DEFAULT_COLOR = { bg: 'bg-slate-50', text: 'text-slate-600', chart: '#94a3b8' };
 
-function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }) {
+function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' | 'personal' }) {
   const styles = {
     pending: { bg: 'bg-amber-50', text: 'text-amber-600', icon: Clock, label: 'Pending' },
     accepted: {
@@ -49,8 +55,11 @@ function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }
       label: 'Accepted',
     },
     declined: { bg: 'bg-rose-50', text: 'text-rose-600', icon: XCircle, label: 'Declined' },
+    personal: { bg: 'bg-slate-50', text: 'text-slate-400', icon: Clock, label: 'Personal' },
   };
-  const { bg, text, icon: Icon, label } = styles[status];
+  const currentStatus = status.toLowerCase() as keyof typeof styles;
+  const { bg, text, icon: Icon, label } = styles[currentStatus] || styles.pending;
+
   return (
     <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${bg} ${text} w-fit mx-auto`}>
       <Icon size={12} />
@@ -61,21 +70,67 @@ function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { transactions } = useTransactions();
+  const { transactions, setTransactions } = useTransactions();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
-<<<<<<< HEAD
+  // 1. 초기 데이터 로드 (REST API)
+  const fetchDashboardData = async () => {
+    try {
+      const [expensesRes, pendingRes] = await Promise.all([
+        api.get('/expenses'),
+        api.get('/expenses/pending'),
+      ]);
+      setTransactions(expensesRes.data);
+      setPendingRequests(pendingRes.data);
+    } catch (error) {
+      console.error('Data load failed', error);
+    }
+  };
+
+  // 2. 실시간 소켓 리스너 설정
+  useEffect(() => {
+    fetchDashboardData();
+
+    // 백엔드의 io.to(recipientId).emit('expense_update_received', ...) 구독
+    socket.on('expense_update_received', (payload: any) => {
+      toast.success(payload.message, { icon: '🔔' });
+      // 리스트에 새 요청 즉시 추가 및 전체 데이터 갱신
+      setPendingRequests((prev) => [payload.data, ...prev]);
+      fetchDashboardData();
+    });
+
+    return () => {
+      socket.off('expense_update_received');
+    };
+  }, []);
+
+  // 3. 승인/거절 처리 (백엔드 PUT /expenses/:id/status 연동)
+  const handleStatusUpdate = async (id: string, status: 'Accepted' | 'Rejected') => {
+    try {
+      await api.put(`/expenses/${id}/status`, { status });
+
+      toast.success(status === 'Accepted' ? 'Expense accepted!' : 'Expense rejected');
+
+      // UI 즉시 업데이트: Pending 목록에서 제거
+      setPendingRequests((prev) => prev.filter((req) => req._id !== id));
+      // 전체 트랜잭션 목록 새로고침
+      fetchDashboardData();
+    } catch (error) {
+      toast.error('Failed to update status');
+    }
+  };
+
+  // --- 기존 차트 및 요약 로직 유지 ---
   const currentMonthStr = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
-  // [핵심 추가] 지난달과 이번 달 상세 비교 로직
   const comparisonStats = useMemo(() => {
     const now = new Date();
     const curMonth = now.getMonth();
     const curYear = now.getFullYear();
-
     const lastMonth = curMonth === 0 ? 11 : curMonth - 1;
     const lastMonthYear = curMonth === 0 ? curYear - 1 : curYear;
 
@@ -83,7 +138,6 @@ export default function Dashboard() {
       const d = new Date(tx.date);
       return d.getMonth() === curMonth && d.getFullYear() === curYear;
     });
-
     const lastMonthTransactions = transactions.filter((tx) => {
       const d = new Date(tx.date);
       return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear;
@@ -91,21 +145,13 @@ export default function Dashboard() {
 
     const thisTotal = thisMonthTransactions.reduce((sum, tx) => sum + tx.amount, 0);
     const lastTotal = lastMonthTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-
     const diff = thisTotal - lastTotal;
     const percent = lastTotal === 0 ? 0 : (diff / lastTotal) * 100;
 
-    // 이번 달 가장 많이 쓴 카테고리 추출
     const catStats = thisMonthTransactions.reduce((acc: any, cur) => {
-=======
-  // 차트 데이터 가공: Category
-  const categoryData = useMemo(() => {
-    const stats = transactions.reduce((acc: Record<string, number>, cur) => {
->>>>>>> origin/frontend-jiae
       acc[cur.category] = (acc[cur.category] || 0) + cur.amount;
       return acc;
     }, {});
-
     const topCategory =
       Object.keys(catStats).sort((a, b) => catStats[b] - catStats[a])[0] || 'None';
 
@@ -127,7 +173,6 @@ export default function Dashboard() {
       acc[cur.category] = (acc[cur.category] || 0) + cur.amount;
       return acc;
     }, {});
-
     return Object.keys(stats).map((key) => ({
       name: key,
       value: stats[key],
@@ -158,15 +203,6 @@ export default function Dashboard() {
     });
   }, [transactions]);
 
-<<<<<<< HEAD
-=======
-  const totalSpending = useMemo(
-    () => transactions.reduce((acc, cur) => acc + cur.amount, 0),
-    [transactions],
-  );
-
-  // 최신순으로 정렬된 최근 5개 내역
->>>>>>> origin/frontend-jiae
   const recentTransactions = useMemo(() => {
     return [...transactions]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -199,9 +235,8 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* 2. Summary & Analysis Section (상세 분석 리포트 추가) */}
+      {/* 2. Summary Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Monthly Spending Card */}
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm flex flex-col justify-center">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 font-mono">
             Monthly Spending
@@ -214,10 +249,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* [NEW] 상세 분석 리포트 카드 */}
+        {/* AI Analysis Card */}
         <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-900/20">
           <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-
           <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center h-full">
             <div>
               <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-3">
@@ -252,7 +286,6 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-
             <div className="flex flex-col items-center md:items-end justify-center gap-2">
               <div
                 className={cn(
@@ -281,77 +314,100 @@ export default function Dashboard() {
                   Vs Last Month
                 </span>
               </div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase mt-2">
-                Last Mo: ${comparisonStats.lastTotal.toLocaleString()}
-              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
-              Category Ratio
+      {/* [Notification Center] Pending Requests */}
+      {pendingRequests.length > 0 && (
+        <div className="bg-blue-50/50 border border-blue-100 p-8 rounded-[2.5rem] space-y-6 animate-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-black text-blue-800 uppercase tracking-[0.2em] flex items-center gap-2">
+              <Bell size={16} className="animate-bounce text-blue-600" /> Pending Invitations
             </h3>
-            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">
-              {currentMonthStr}
+            <span className="bg-blue-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
+              {pendingRequests.length} NEW
             </span>
           </div>
-          <div className="h-[250px] w-full">
-            {categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={90}
-                    paddingAngle={8}
-                    dataKey="value"
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip
-                    contentStyle={{
-                      borderRadius: '20px',
-                      border: 'none',
-                      boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-slate-300 text-xs font-black uppercase tracking-widest">
-                No data for this month
-              </div>
-            )}
-          </div>
-          <div className="mt-6 flex flex-wrap gap-2 justify-center">
-            {categoryData.map((item) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingRequests.map((req) => (
               <div
-                key={item.name}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100"
+                key={req._id}
+                className="bg-white p-5 rounded-3xl shadow-sm border border-blue-200 flex flex-col gap-4 hover:shadow-md transition-shadow"
               >
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">
-                  {item.name}
-                </span>
+                <div className="flex justify-between items-start">
+                  <span
+                    className={cn(
+                      'text-[9px] font-black px-2.5 py-1 rounded-lg uppercase',
+                      CATEGORY_COLORS[req.category]?.bg,
+                      CATEGORY_COLORS[req.category]?.text,
+                    )}
+                  >
+                    {req.category}
+                  </span>
+                  <span className="font-black text-slate-900 text-lg">
+                    ${req.amount.toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <p className="font-bold text-slate-800 text-sm">{req.title}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                    From: {req.paidBy?.firstName || 'Someone'}
+                  </p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => handleStatusUpdate(req._id, 'Accepted')}
+                    className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-[10px] font-black hover:bg-blue-700 transition-all flex items-center justify-center gap-1 uppercase"
+                  >
+                    <Check size={14} /> Accept
+                  </button>
+                  <button
+                    onClick={() => handleStatusUpdate(req._id, 'Rejected')}
+                    className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-[10px] font-black hover:bg-rose-50 hover:text-rose-600 transition-all flex items-center justify-center gap-1 uppercase"
+                  >
+                    <X size={14} /> Decline
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </div>
+      )}
 
+      {/* 3. Charts & History (기존과 동일) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm">
+          <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">
+            Category Ratio
+          </h3>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={70}
+                  outerRadius={90}
+                  paddingAngle={8}
+                  dataKey="value"
+                >
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm">
           <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">
             Spending Trend
           </h3>
-          <div className="h-[250px] w-full">
+          <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
@@ -361,11 +417,6 @@ export default function Dashboard() {
                   tickLine={false}
                   tick={{ fontSize: 10, fontWeight: 800, fill: '#cbd5e1' }}
                 />
-                <YAxis hide />
-                <RechartsTooltip
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '16px', border: 'none' }}
-                />
                 <Bar dataKey="amount" fill="#2563eb" radius={[8, 8, 0, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
@@ -373,18 +424,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 4. Transaction History */}
       <div className="space-y-6">
-        <div className="flex justify-between items-center px-2">
-          <h3 className="text-xl font-black text-slate-900 tracking-tight">Recent Activity</h3>
-          <button
-            onClick={() => navigate('/transaction')}
-            className="flex items-center gap-2 text-blue-600 font-black text-[11px] uppercase tracking-widest hover:gap-3 transition-all"
-          >
-            View All Transactions <ArrowRight size={16} />
-          </button>
-        </div>
-
+        <h3 className="text-xl font-black text-slate-900 px-2">Recent Activity</h3>
         <div className="bg-white rounded-[2.5rem] border border-slate-50 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left">
@@ -399,10 +440,6 @@ export default function Dashboard() {
                   <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Description
                   </th>
-                  {/* Recipient 열 추가 */}
-                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
-                    Recipient
-                  </th>
                   <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Status
                   </th>
@@ -412,77 +449,48 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-<<<<<<< HEAD
-                {recentTransactions.map((tx) => {
-                  const catStyle = CATEGORY_COLORS[tx.category] || DEFAULT_COLOR;
-                  return (
-                    <tr
-                      key={tx.id}
-                      className="group hover:bg-slate-50/50 transition-all cursor-pointer"
-                      onClick={() => navigate('/transaction', { state: { selectedId: tx.id } })}
-                    >
-                      <td className="px-8 py-5 text-xs font-bold text-slate-400">{tx.date}</td>
-                      <td className="px-8 py-5">
-                        <span
-                          className={cn(
-                            'text-[9px] font-black px-2.5 py-1 rounded-lg uppercase',
-                            catStyle.bg,
-                            catStyle.text,
-                          )}
-                        >
-                          {tx.category}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 font-bold text-slate-900">{tx.title}</td>
-
-                      {/* 1. Recipient 데이터 표시 (이름/이메일) */}
-                      <td className="px-8 py-5 text-center text-[11px] font-bold text-slate-500 italic">
-                        {tx.recipientName || tx.shareWith || (
-                          <span className="text-slate-200 not-italic">-</span>
-                        )}
-                      </td>
-
-                      {/* 2. Status 배지 표시 */}
-                      <td className="px-8 py-5 text-center">
-=======
                 {recentTransactions.map((tx) => (
                   <tr
-                    key={tx.id}
-                    className="group hover:bg-slate-50/30 transition-colors cursor-pointer"
-                    onClick={() => navigate('/transaction', { state: { selectedId: tx.id } })}
+                    key={tx._id || tx.id}
+                    className="group hover:bg-slate-50/50 transition-all cursor-pointer"
                   >
-                    <td className="px-8 py-5 text-xs font-bold text-slate-400 whitespace-nowrap">
-                      {tx.date}
+                    <td className="px-8 py-5 text-xs font-bold text-slate-400">
+                      {new Date(tx.date).toLocaleDateString()}
                     </td>
                     <td className="px-8 py-5">
-                      <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-tighter">
+                      <span
+                        className={cn(
+                          'text-[9px] font-black px-2.5 py-1 rounded-lg uppercase',
+                          CATEGORY_COLORS[tx.category]?.bg,
+                          CATEGORY_COLORS[tx.category]?.text,
+                        )}
+                      >
                         {tx.category}
                       </span>
                     </td>
-                    <td className="px-8 py-5 font-bold text-slate-900 truncate max-w-[200px]">
-                      {tx.title}
+                    <td className="px-8 py-5 font-bold text-slate-900">{tx.title}</td>
+                    <td className="px-8 py-5 text-center">
+                      {tx.shareWith ? (
+                        // 'as any' 보다는 구체적인 타입 단언을 사용하는 것이 좋습니다.
+                        <StatusBadge
+                          status={
+                            (tx.status?.toLowerCase() || 'pending') as
+                              | 'pending'
+                              | 'accepted'
+                              | 'declined'
+                          }
+                        />
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                          -
+                        </span>
+                      )}
                     </td>
-                    <td className="px-8 py-5 text-center text-xs font-medium text-slate-500 italic">
-                      {tx.recipientName || tx.shareWith || '-'}
+                    <td className="px-8 py-5 text-right font-black text-slate-900">
+                      -${tx.amount.toFixed(2)}
                     </td>
-                    <td className="px-8 py-5">
-                      <div className="flex justify-center items-center">
->>>>>>> origin/frontend-jiae
-                        {tx.shareWith ? (
-                          <StatusBadge status={tx.status || 'pending'} />
-                        ) : (
-                          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                            -
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-8 py-5 text-right font-black text-slate-900">
-                        -${tx.amount.toFixed(2)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

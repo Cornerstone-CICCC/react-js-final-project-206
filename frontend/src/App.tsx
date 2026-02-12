@@ -1,48 +1,34 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
+// 레이아웃 및 인증 관련
 import MainLayout from './components/layout/MainLayout';
-<<<<<<< HEAD
-import Dashboard from './pages/Dashboard';
-import CalendarPage from './pages/Calendar';
-import { TransactionProvider } from './context/TransactionContext';
-=======
+import ProtectedRoute from './routes/ProtectedRoute';
 
->>>>>>> origin/frontend-jiae
+// 컨텍스트 (Bella 쪽 Provider)
+import { TransactionProvider } from './context/TransactionContext';
+
+// 페이지 컴포넌트
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
-import TestComponent from './pages/TestComponent';
-
-// bella 쪽에서 추가된 페이지들 (있는 경우만)
 import CalendarPage from './pages/Calendar';
 import { TransactionPage } from './pages/Transaction';
-// import { ProfilePage } from './pages/Profile';
-
-// bella 쪽 Provider (경로/이름이 이대로여야 함)
-import { TransactionProvider } from './context/TransactionContext';
-
-import ProtectedRoute from './routes/ProtectedRoute';
 
 function App() {
   return (
     <TransactionProvider>
       <BrowserRouter>
-<<<<<<< HEAD
         <Toaster position="top-right" />
+
         <Routes>
-=======
-        <Routes>
-          {/* Public */}
->>>>>>> origin/frontend-jiae
+          {/* 1. Public 영역 */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 
-<<<<<<< HEAD
-=======
-          {/* Protected 영역: 로그인 필요 */}
->>>>>>> origin/frontend-jiae
+          {/* 2. Protected 영역 */}
           <Route
             element={
               <ProtectedRoute>
@@ -52,22 +38,17 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/profile" element={<Profile />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/transaction" element={<TransactionPage />} />
-            {/* 2. 경로 연결 */}
-            {/* <Route path="/profile" element={<ProfilePage />} /> */}
+            <Route path="/profile" element={<Profile />} />
           </Route>
 
-<<<<<<< HEAD
-=======
-          {/* Entry */}
->>>>>>> origin/frontend-jiae
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* 3. 첫 페이지 접속 시 무조건 로그인으로 이동 */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
 
-          {/* 404 */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* 정의되지 않은 모든 경로는 로그인으로 리다이렉트 (보안 강화) */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </TransactionProvider>

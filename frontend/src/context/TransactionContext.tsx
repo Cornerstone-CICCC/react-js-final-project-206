@@ -1,54 +1,59 @@
 import React, { createContext, useContext, useState, type ReactNode } from 'react';
 
-// 1. Transaction 타입 정의 (기존 코드에 맞춰 확인)
+// 1. Transaction 타입 정의
 export interface Transaction {
-  id: number;
+  note: string;
+  id?: number; // 기존 로컬 ID
+  _id?: string; // MongoDB용 ID (추가)
   title: string;
   amount: number;
   category: string;
   date: string;
-  shareWith?: string; // 이메일 주소 등
-  recipientName?: string; // 수신자 이름 (추가!)
+  shareWith?: string;
+  recipientName?: string;
   memo?: string;
-  status?: 'pending' | 'accepted' | 'declined'; // 상태 (추가!)
+  status?: 'pending' | 'accepted' | 'declined' | 'Pending' | 'Accepted' | 'Rejected'; // 대소문자 호환
 }
 
 interface TransactionContextType {
   transactions: Transaction[];
-  addTransaction: (tx: Omit<Transaction, 'id'>) => void;
-  deleteTransaction: (id: number) => void;
-  updateTransaction: (id: number, updates: Partial<Transaction>) => void; // 2. 타입 정의 추가
+  setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+  addTransaction: (data: any) => void;
+  // 매개변수 타입을 interface와 동일하게 맞춤
+  updateTransaction: (id: number | string, data: any) => void;
+  deleteTransaction: (id: number | string) => void;
 }
 
 const TransactionContext = createContext<TransactionContextType | undefined>(undefined);
 
-export function TransactionProvider({ children }: { children: ReactNode }) {
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    // 초기 더미 데이터 (있다면 유지)
-    { id: 1, title: 'Groceries', amount: 120.5, category: 'Food', date: '2026-02-09' },
-  ]);
+export function TransactionProvider({ children }: { children: React.ReactNode }) {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   const addTransaction = (tx: Omit<Transaction, 'id'>) => {
     const newTransaction = { ...tx, id: Date.now() };
     setTransactions((prev) => [newTransaction, ...prev]);
   };
 
-  const deleteTransaction = (id: number) => {
-    setTransactions((prev) => prev.filter((tx) => tx.id !== id));
+  // 2. 삭제 로직 수정 (매개변수 id 타입을 number | string으로 변경)
+  const deleteTransaction = (id: number | string) => {
+    setTransactions((prev) => prev.filter((tx) => tx.id !== id && tx._id !== id));
   };
 
-  // 3. 수정 로직 추가 (이 부분이 핵심!)
-  const updateTransaction = (id: number, updates: Partial<Transaction>) => {
-    setTransactions((prev) => prev.map((tx) => (tx.id === id ? { ...tx, ...updates } : tx)));
+  // 3. 수정 로직 수정 (매개변수 id 타입을 number | string으로 변경)
+  const updateTransaction = (id: number | string, updates: Partial<Transaction>) => {
+    setTransactions((prev) =>
+      prev.map((tx) => (tx.id === id || tx._id === id ? { ...tx, ...updates } : tx)),
+    );
   };
 
   return (
     <TransactionContext.Provider
       value={{
         transactions,
+        setTransactions,
         addTransaction,
+        updateTransaction,
         deleteTransaction,
-        updateTransaction, // 4. value에 추가
       }}
     >
       {children}
