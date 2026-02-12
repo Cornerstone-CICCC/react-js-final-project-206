@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import axios from 'axios';
 import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { TOKEN_STORAGE_KEY } from '../contexts/AuthContext';
@@ -33,4 +34,17 @@ api.interceptors.request.use(
   (error: AxiosError) => Promise.reject(error),
 );
 
+=======
+// frontend/src/lib/api.ts
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3000",
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+>>>>>>> origin/feature/backend-env
 export default api;
