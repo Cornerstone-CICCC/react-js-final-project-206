@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   X,
   DollarSign,
@@ -21,20 +22,6 @@ interface AddTransactionModalProps {
 
 const CATEGORIES = ['Food', 'Transport', 'Rent', 'Household', 'Health', 'Education', 'Other'];
 
-// 가상 유저 데이터 (실제 연동 시 API 호출로 대체)
-const REGISTERED_USERS = [
-  {
-    email: 'partner@example.com',
-    name: 'Felix',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-  },
-  {
-    email: 'test@test.com',
-    name: 'Sarah',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
-  },
-];
-
 export default function AddTransactionModal({
   isOpen,
   onClose,
@@ -42,48 +29,49 @@ export default function AddTransactionModal({
 }: AddTransactionModalProps) {
   const { addTransaction } = useTransactions();
 
-  // 폼 상태
   const [formData, setFormData] = useState({
     date: initialDate || new Date().toISOString().split('T')[0],
     title: '',
     amount: '',
     category: 'Food',
     shareWith: '',
-    memo: '',
+    note: '',
   });
 
-  // 이메일 검증 상태 관리
   const [emailStatus, setEmailStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   const [foundUser, setFoundUser] = useState<{ name: string; avatar: string } | null>(null);
 
-  // 이메일 입력 시 유효성 검사 (디바운싱 적용)
   useEffect(() => {
-    if (!formData.shareWith) {
+    if (!formData.shareWith || !formData.shareWith.includes('@')) {
       setEmailStatus('idle');
       setFoundUser(null);
       return;
     }
 
-    const timer = setTimeout(() => {
-      // 간단한 이메일 형식 체크
-      if (!formData.shareWith.includes('@')) {
-        setEmailStatus('invalid');
-        return;
-      }
-
+    const timer = setTimeout(async () => {
       setEmailStatus('loading');
 
-      // 서버 통신 시뮬레이션 (500ms 딜레이)
-      setTimeout(() => {
-        const user = REGISTERED_USERS.find((u) => u.email === formData.shareWith);
-        if (user) {
+      try {
+        const response = await axios.get(
+          `http://localhost:3000/users/search?email=${formData.shareWith.trim().toLowerCase()}`,
+          { withCredentials: true },
+        );
+
+        if (response.data && response.data.firstName) {
+          const user = response.data;
           setEmailStatus('valid');
-          setFoundUser({ name: user.name, avatar: user.avatar });
+          setFoundUser({
+            name: `${user.firstName} ${user.lastName}`,
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.firstName}`,
+          });
         } else {
           setEmailStatus('invalid');
           setFoundUser(null);
         }
-      }, 500);
+      } catch (error) {
+        setEmailStatus('invalid');
+        setFoundUser(null);
+      }
     }, 500);
 
     return () => clearTimeout(timer);
@@ -100,28 +88,32 @@ export default function AddTransactionModal({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addTransaction({
-      title: formData.title,
-      amount: parseFloat(formData.amount) || 0,
-      category: formData.category,
-      date: formData.date,
-      shareWith: formData.shareWith,
-      memo: formData.memo,
-      // 여기에 status: 'pending' 등을 추가하여 알림 시스템과 연동할 수 있습니다.
-    });
 
-    setFormData({
-      title: '',
-      amount: '',
-      category: 'Food',
-      shareWith: '',
-      memo: '',
-      date: new Date().toISOString().split('T')[0],
-    });
-    setEmailStatus('idle');
-    onClose();
+    try {
+      await addTransaction({
+        title: formData.title,
+        amount: parseFloat(formData.amount) || 0,
+        category: formData.category,
+        date: formData.date.substring(0, 10),
+        sharedWithEmail: formData.shareWith.trim().toLowerCase(),
+        note: formData.note,
+      });
+
+      setFormData({
+        title: '',
+        amount: '',
+        category: 'Food',
+        shareWith: '',
+        note: '',
+        date: new Date().toISOString().split('T')[0],
+      });
+      setEmailStatus('idle');
+      onClose();
+    } catch (err) {
+      console.error('Failed to save:', err);
+    }
   };
 
   return (
@@ -148,7 +140,6 @@ export default function AddTransactionModal({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Title */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                 Title
@@ -215,7 +206,7 @@ export default function AddTransactionModal({
               </select>
             </div>
 
-            {/* Recipient Email (핵심 수정 부분) */}
+            {/* Recipient Email */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                 Recipient Email (Request Approval)
@@ -240,7 +231,6 @@ export default function AddTransactionModal({
                   onChange={(e) => setFormData({ ...formData, shareWith: e.target.value })}
                 />
 
-                {/* 실시간 피드백 아이콘/아바타 */}
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   {emailStatus === 'loading' && (
                     <Loader2 size={16} className="text-blue-600 animate-spin" />
@@ -264,7 +254,7 @@ export default function AddTransactionModal({
               </div>
             </div>
 
-            {/* Memo */}
+            {/* Memo (note) */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1">
                 <StickyNote size={10} /> Detailed Memo
@@ -273,8 +263,8 @@ export default function AddTransactionModal({
                 placeholder="Notes about this expense..."
                 rows={2}
                 className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-blue-600/20 transition-all outline-none resize-none font-medium"
-                value={formData.memo}
-                onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
+                value={formData.note}
+                onChange={(e) => setFormData({ ...formData, note: e.target.value })}
               />
             </div>
 

@@ -6,7 +6,10 @@ import { User } from '../models/user.model';
 const getAllShared = async (userId: string) => {
   return await Expense.find({
     $or: [{ paidBy: userId }, { sharedWith: userId }],
-  }).sort({ date: -1 });
+  })
+  .populate('paidBy', 'email firstName lastName') // 결제자 정보(이메일 포함)
+  .populate('sharedWith', 'email firstName lastName') // 공유받은 사람 정보
+  .sort({ date: -1 });
 };
 
 // Get a single expense by ID
@@ -41,13 +44,14 @@ const add = async (expenseData: Partial<IExpense> & { sharedWithEmail?: string }
   }
 
   return await Expense.create({
-    title,
+   title,
     amount,
     category,
     note: note || '',
     status,
     paidBy,
     sharedWith: sharedWithId,
+    sharedWithEmail: sharedWithEmail?.trim().toLowerCase(), // Added by Bella
     date: date || new Date(),
   });
 };

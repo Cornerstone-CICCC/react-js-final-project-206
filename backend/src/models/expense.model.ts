@@ -18,6 +18,7 @@ export interface IExpense extends Document {
   status: ExpenseStatus;
   paidBy: mongoose.Types.ObjectId;
   sharedWith?: mongoose.Types.ObjectId | null;
+  sharedWithEmail?: string; // Added by Bella - Added email field to the interface
   date: Date;
 }
 
@@ -39,6 +40,7 @@ const ExpenseSchema: Schema = new Schema(
     },
     paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     sharedWith: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    sharedWithEmail: { type: String, default: null }, // Added by Bella - Added email field to the schema
     date: { type: Date, default: Date.now },
   },
   {

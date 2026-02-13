@@ -19,7 +19,10 @@ const user_model_1 = require("../models/user.model");
 const getAllShared = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     return yield expense_model_1.Expense.find({
         $or: [{ paidBy: userId }, { sharedWith: userId }],
-    }).sort({ date: -1 });
+    })
+        .populate('paidBy', 'email firstName lastName') // 결제자 정보(이메일 포함)
+        .populate('sharedWith', 'email firstName lastName') // 공유받은 사람 정보
+        .sort({ date: -1 });
 });
 // Get a single expense by ID
 const getById = (id) => __awaiter(void 0, void 0, void 0, function* () {
@@ -53,6 +56,7 @@ const add = (expenseData) => __awaiter(void 0, void 0, void 0, function* () {
         status,
         paidBy,
         sharedWith: sharedWithId,
+        sharedWithEmail: sharedWithEmail === null || sharedWithEmail === void 0 ? void 0 : sharedWithEmail.trim().toLowerCase(), // Added by Bella
         date: date || new Date(),
     });
 });

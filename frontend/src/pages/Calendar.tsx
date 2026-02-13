@@ -9,7 +9,6 @@ export default function CalendarPage() {
   const navigate = useNavigate();
   const { transactions, deleteTransaction } = useTransactions();
 
-  // 오늘 날짜 포맷팅 (YYYY-MM-DD)
   const getTodayStr = () => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -19,12 +18,16 @@ export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 선택된 날짜의 트랜잭션 필터링
+  const normalizeDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    return dateStr.substring(0, 10).replace(/\./g, '-').replace(/\//g, '-');
+  };
+
   const selectedDayTransactions = useMemo(() => {
-    return transactions.filter((tx) => tx.date === selectedDate);
+    const target = normalizeDate(selectedDate);
+    return transactions.filter((tx) => normalizeDate(tx.date) === target);
   }, [transactions, selectedDate]);
 
-  // 달력 날짜 계산
   const daysInMonth = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -43,14 +46,12 @@ export default function CalendarPage() {
     setCurrentMonth(newMonth);
   };
 
-  // [추가] 상세 페이지 이동 핸들러
-  const handleTransactionClick = (txId: string | number) => {
+  const handleTransactionClick = (txId: string) => {
     navigate('/transaction', { state: { selectedId: txId } });
   };
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 h-full animate-in fade-in duration-500">
-      {/* 왼쪽: 달력 메인 */}
       <div className="flex-1 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-50">
         <div className="flex justify-between items-center mb-8 px-2">
           <h2 className="text-xl font-black text-slate-900 tracking-tight">
@@ -91,7 +92,9 @@ export default function CalendarPage() {
             const day = i + 1;
             const dateStr = `${daysInMonth.year}-${String(daysInMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const isSelected = selectedDate === dateStr;
-            const hasData = transactions.some((tx) => tx.date === dateStr);
+
+            // [수정] 데이터 존재 여부 확인 로직 강화
+            const hasData = transactions.some((tx) => normalizeDate(tx.date) === dateStr);
 
             return (
               <button
@@ -114,7 +117,6 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* 오른쪽: 지출 상세 내역 */}
       <div className="w-full lg:w-[400px] flex flex-col gap-6">
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-50 flex-1 flex flex-col min-h-[500px]">
           <div className="flex justify-between items-center mb-6">
@@ -136,8 +138,8 @@ export default function CalendarPage() {
             {selectedDayTransactions.length > 0 ? (
               selectedDayTransactions.map((tx) => (
                 <div
-                  key={tx.id}
-                  onClick={() => handleTransactionClick(tx.id)} // [수정] 내역 클릭 시 이동
+                  key={tx._id}
+                  onClick={() => handleTransactionClick(tx._id)}
                   className="group flex items-center justify-between p-4 rounded-2xl border border-slate-50 hover:border-blue-100 hover:bg-blue-50/30 transition-all cursor-pointer"
                 >
                   <div className="flex items-center gap-4 min-w-0">
@@ -163,8 +165,8 @@ export default function CalendarPage() {
                     <p className="text-sm font-black text-slate-900">${tx.amount.toFixed(2)}</p>
                     <button
                       onClick={(e) => {
-                        e.stopPropagation(); // [중요] 삭제 버튼 클릭 시 이동 방지
-                        deleteTransaction(tx.id);
+                        e.stopPropagation();
+                        deleteTransaction(tx._id);
                       }}
                       className="p-1.5 text-slate-200 hover:text-rose-500 transition-all opacity-0 group-hover:opacity-100"
                     >

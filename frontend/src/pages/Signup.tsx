@@ -1,11 +1,10 @@
-// frontend/src/pages/signup.tsx
-import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import zxcvbn from "zxcvbn";
-import toast from "react-hot-toast";
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import zxcvbn from 'zxcvbn';
+import toast from 'react-hot-toast';
 
-import api from "../lib/api";
-import { useAuth } from "../context/AuthContext";
+import api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 type SignupFormState = {
   firstName: string;
@@ -29,14 +28,14 @@ type LoginBackendResponse = {
   };
 };
 
-// ✅ 반응형: 모바일만 판별
+// ✅ Responsive: Mobile only
 function useIsMobile(breakpoint = 640) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < breakpoint);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, [breakpoint]);
 
   return isMobile;
@@ -50,11 +49,11 @@ export default function Signup() {
   const styles = useMemo(() => makeStyles({ isMobile }), [isMobile]);
 
   const [form, setForm] = useState<SignupFormState>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,7 +75,7 @@ export default function Signup() {
 
     const minLenOk = form.password.length >= 8;
     const matchOk = form.password === form.confirmPassword;
-    const strengthOk = strength.score >= 3; // ✅ 백엔드 기준(score < 3이면 거절)
+    const strengthOk = strength.score >= 3;
 
     return {
       fieldsFilled,
@@ -95,28 +94,28 @@ export default function Signup() {
   const getStrengthLabel = (score: number) => {
     switch (score) {
       case 0:
-        return "Very weak";
+        return 'Very weak';
       case 1:
-        return "Weak";
+        return 'Weak';
       case 2:
-        return "Okay";
+        return 'Okay';
       case 3:
-        return "Strong";
+        return 'Strong';
       case 4:
-        return "Very strong";
+        return 'Very strong';
       default:
-        return "";
+        return '';
     }
   };
 
   const normalizeError = (err: any) => {
     const msg = err?.response?.data?.message;
-    if (typeof msg === "string" && msg.trim()) return msg;
+    if (typeof msg === 'string' && msg.trim()) return msg;
 
     const status = err?.response?.status;
-    if (status === 409) return "This email is already registered.";
-    if (status === 400) return "Please check your input and try again.";
-    return "An error occurred during registration.";
+    if (status === 409) return 'This email is already registered.';
+    if (status === 400) return 'Please check your input and try again.';
+    return 'An error occurred during registration.';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,17 +132,16 @@ export default function Signup() {
     try {
       setIsSubmitting(true);
 
-      // ✅ 1) 회원가입
-      const { data: signupData } = await api.post<SignupBackendResponse>("/users/signup", payload);
-      toast.success(signupData?.message ?? "User successfully registered!");
+      // ✅ 1) Sign up
+      const { data: signupData } = await api.post<SignupBackendResponse>('/users/signup', payload);
+      toast.success(signupData?.message ?? 'User successfully registered!');
 
-      // ✅ 2) 가입 직후 바로 로그인해서 세션 생성
-      const { data: loginData } = await api.post<LoginBackendResponse>("/users/login", {
+      // ✅ 2) Log in immediately after sign-up to create a session
+      const { data: loginData } = await api.post<LoginBackendResponse>('/users/login', {
         email: payload.email,
         password: payload.password,
       });
 
-      // 전역 상태 반영(또는 refreshAuth로 동기화)
       setUser({
         id: loginData.user.id,
         email: loginData.user.email,
@@ -152,8 +150,8 @@ export default function Signup() {
       });
       await refreshAuth();
 
-      toast.success(loginData.message ?? "Login successful!");
-      navigate("/dashboard", { replace: true });
+      toast.success(loginData.message ?? 'Login successful!');
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       toast.error(normalizeError(err));
     } finally {
@@ -167,7 +165,7 @@ export default function Signup() {
         <h2 style={styles.title}>Create account</h2>
         <p style={styles.subtitle}>Sign up to get started</p>
 
-        <form onSubmit={handleSubmit} style={{ width: "100%" }}>
+        <form onSubmit={handleSubmit} style={{ width: '100%' }}>
           <div style={styles.row}>
             <label style={styles.label}>
               First name
@@ -214,7 +212,7 @@ export default function Signup() {
             <div style={styles.pwWrap}>
               <input
                 style={styles.pwInput}
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 name="password"
                 value={form.password}
                 onChange={handleChange}
@@ -226,9 +224,9 @@ export default function Signup() {
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 style={styles.pwToggle}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
           </label>
@@ -244,7 +242,7 @@ export default function Signup() {
                 style={{
                   ...styles.meterFill,
                   width: `${((strength.score + 1) / 5) * 100}%`,
-                  backgroundColor: strength.score < 3 ? "#ef4444" : "#1f6bff",
+                  backgroundColor: strength.score < 3 ? '#ef4444' : '#1f6bff',
                 }}
               />
             </div>
@@ -264,7 +262,7 @@ export default function Signup() {
             <div style={styles.pwWrap}>
               <input
                 style={styles.pwInput}
-                type={showConfirmPassword ? "text" : "password"}
+                type={showConfirmPassword ? 'text' : 'password'}
                 name="confirmPassword"
                 value={form.confirmPassword}
                 onChange={handleChange}
@@ -276,9 +274,9 @@ export default function Signup() {
                 type="button"
                 onClick={() => setShowConfirmPassword((v) => !v)}
                 style={styles.pwToggle}
-                aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
               >
-                {showConfirmPassword ? "Hide" : "Show"}
+                {showConfirmPassword ? 'Hide' : 'Show'}
               </button>
             </div>
           </label>
@@ -292,15 +290,15 @@ export default function Signup() {
             style={{
               ...styles.primaryBtn,
               opacity: validation.canSubmit ? 1 : 0.6,
-              cursor: validation.canSubmit ? "pointer" : "not-allowed",
+              cursor: validation.canSubmit ? 'pointer' : 'not-allowed',
             }}
             disabled={!validation.canSubmit}
           >
-            {isSubmitting ? "Creating..." : "Sign Up"}
+            {isSubmitting ? 'Creating...' : 'Sign Up'}
           </button>
 
           <p style={styles.bottomText}>
-            Already have an account?{" "}
+            Already have an account?{' '}
             <Link to="/login" style={styles.link}>
               Log in
             </Link>
@@ -314,97 +312,96 @@ export default function Signup() {
 function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.CSSProperties> {
   return {
     page: {
-      minHeight: "100vh",
-      display: "grid",
-      placeItems: "center",
+      minHeight: '100vh',
+      display: 'grid',
+      placeItems: 'center',
       padding: isMobile ? 14 : 24,
-      background: "#0F1115", // ✅ 변경: 배경만 통일
+      background: '#0F1115',
       fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
     },
 
     card: {
-      width: "min(420px, 100%)",
-      background: "#fff",
+      width: 'min(420px, 100%)',
+      background: '#fff',
       borderRadius: isMobile ? 16 : 14,
-      padding: isMobile ? "22px 18px 24px" : "28px 28px 32px",
-      boxShadow: "0 18px 40px rgba(10, 20, 40, 0.12)",
+      padding: isMobile ? '22px 18px 24px' : '28px 28px 32px',
+      boxShadow: '0 18px 40px rgba(10, 20, 40, 0.12)',
     },
 
     title: {
       margin: 0,
       fontSize: isMobile ? 24 : 28,
       fontWeight: 800,
-      color: "#0f172a",
+      color: '#0f172a',
     },
 
     subtitle: {
-      margin: "8px 0 18px",
+      margin: '8px 0 18px',
       fontSize: 13,
-      color: "#64748b",
+      color: '#64748b',
     },
 
-    // ✅ 모바일: 이름 입력 2개를 세로로 쌓음
     row: {
-      display: "flex",
+      display: 'flex',
       gap: 12,
-      flexDirection: isMobile ? "column" : "row",
+      flexDirection: isMobile ? 'column' : 'row',
     },
 
     label: {
-      width: "100%",
-      display: "flex",
-      flexDirection: "column",
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
       gap: 8,
       fontSize: 12,
-      color: "#334155",
+      color: '#334155',
       fontWeight: 700,
       marginBottom: 14,
     },
 
     input: {
-      width: "100%",
+      width: '100%',
       height: 44,
       borderRadius: 10,
-      border: "1px solid #e5e7eb",
-      background: "#f8fafc",
-      padding: "0 14px",
+      border: '1px solid #e5e7eb',
+      background: '#f8fafc',
+      padding: '0 14px',
       fontSize: 14,
-      outline: "none",
-      boxSizing: "border-box",
+      outline: 'none',
+      boxSizing: 'border-box',
     },
 
     // ✅ password toggle UI
     pwWrap: {
-      position: "relative",
-      width: "100%",
-      display: "flex",
-      alignItems: "center",
+      position: 'relative',
+      width: '100%',
+      display: 'flex',
+      alignItems: 'center',
     },
 
     pwInput: {
-      width: "100%",
+      width: '100%',
       height: 44,
       borderRadius: 10,
-      border: "1px solid #e5e7eb",
-      background: "#f8fafc",
-      padding: "0 72px 0 14px",
+      border: '1px solid #e5e7eb',
+      background: '#f8fafc',
+      padding: '0 72px 0 14px',
       fontSize: 14,
-      outline: "none",
-      boxSizing: "border-box",
+      outline: 'none',
+      boxSizing: 'border-box',
     },
 
     pwToggle: {
-      position: "absolute",
+      position: 'absolute',
       right: 10,
       height: 30,
-      padding: "0 10px",
+      padding: '0 10px',
       borderRadius: 8,
-      border: "1px solid #e5e7eb",
-      background: "#ffffff",
+      border: '1px solid #e5e7eb',
+      background: '#ffffff',
       fontWeight: 900,
       fontSize: 12,
-      color: "#475569",
-      cursor: "pointer",
+      color: '#475569',
+      cursor: 'pointer',
     },
 
     strengthWrap: {
@@ -412,70 +409,70 @@ function makeStyles({ isMobile }: { isMobile: boolean }): Record<string, React.C
       marginBottom: 14,
       padding: 12,
       borderRadius: 12,
-      border: "1px solid #e5e7eb",
-      background: "#ffffff",
+      border: '1px solid #e5e7eb',
+      background: '#ffffff',
     },
 
     strengthHeader: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "baseline",
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
       marginBottom: 10,
     },
 
-    strengthLabel: { fontSize: 12, fontWeight: 800, color: "#0f172a" },
-    strengthValue: { fontSize: 12, fontWeight: 800, color: "#64748b" },
+    strengthLabel: { fontSize: 12, fontWeight: 800, color: '#0f172a' },
+    strengthValue: { fontSize: 12, fontWeight: 800, color: '#64748b' },
 
     meterTrack: {
       height: 8,
-      background: "#e5e7eb",
+      background: '#e5e7eb',
       borderRadius: 999,
-      overflow: "hidden",
+      overflow: 'hidden',
     },
 
     meterFill: {
-      height: "100%",
+      height: '100%',
       borderRadius: 999,
-      transition: "width 0.3s ease, background-color 0.3s ease",
+      transition: 'width 0.3s ease, background-color 0.3s ease',
     },
 
     rules: {
-      margin: "10px 0 0",
+      margin: '10px 0 0',
       paddingLeft: 16,
       fontSize: 12,
       lineHeight: 1.6,
     },
 
-    ruleOk: { color: "#15803d", fontWeight: 700 },
-    ruleBad: { color: "#b91c1c", fontWeight: 700 },
+    ruleOk: { color: '#15803d', fontWeight: 700 },
+    ruleBad: { color: '#b91c1c', fontWeight: 700 },
 
     hint: {
       marginTop: -8,
       marginBottom: 12,
       fontSize: 12,
-      color: "#b91c1c",
+      color: '#b91c1c',
       fontWeight: 700,
     },
 
     primaryBtn: {
-      width: "100%",
+      width: '100%',
       height: 44,
       borderRadius: 10,
-      border: "none",
-      background: "#1f6bff",
-      color: "#fff",
+      border: 'none',
+      background: '#1f6bff',
+      color: '#fff',
       fontWeight: 900,
       fontSize: 15,
-      transition: "all 0.2s ease",
+      transition: 'all 0.2s ease',
     },
 
     bottomText: {
       marginTop: 18,
       fontSize: 12,
-      color: "#64748b",
-      textAlign: "center",
+      color: '#64748b',
+      textAlign: 'center',
     },
 
-    link: { color: "#1f6bff", textDecoration: "none", fontWeight: 900 },
+    link: { color: '#1f6bff', textDecoration: 'none', fontWeight: 900 },
   };
 }

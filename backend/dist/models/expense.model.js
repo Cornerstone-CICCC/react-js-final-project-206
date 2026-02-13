@@ -52,6 +52,7 @@ const ExpenseSchema = new mongoose_1.Schema({
     },
     paidBy: { type: mongoose_1.default.Schema.Types.ObjectId, ref: 'User', required: true },
     sharedWith: { type: mongoose_1.default.Schema.Types.ObjectId, ref: 'User', default: null },
+    sharedWithEmail: { type: String, default: null }, // Added by Bella - Added email field to the schema
     date: { type: Date, default: Date.now },
 }, {
     timestamps: true,

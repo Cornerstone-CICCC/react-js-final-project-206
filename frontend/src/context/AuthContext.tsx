@@ -1,6 +1,5 @@
-// frontend/src/context/AuthContext.tsx
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import api from "../lib/api";
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import api from '../lib/api';
 
 export type AuthUser = {
   id: string;
@@ -12,7 +11,7 @@ export type AuthUser = {
 type AuthState = {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  isBooting: boolean; // 앱 최초 로딩 시 세션 체크 중
+  isBooting: boolean;
 };
 
 type AuthContextValue = {
@@ -39,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAuth = async () => {
     try {
-      const { data } = await api.get<CheckAuthResponse>("/users/check-auth");
+      const { data } = await api.get<CheckAuthResponse>('/users/check-auth');
       setUser({
         id: data.id,
         email: data.email,
@@ -47,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         lastName: data.lastName,
       });
     } catch {
-      // 세션 없거나 만료
       setUser(null);
     }
   };
@@ -59,7 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsBooting(false);
     };
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -81,6 +78,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }

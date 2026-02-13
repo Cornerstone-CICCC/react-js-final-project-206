@@ -1,9 +1,8 @@
-// frontend/src/pages/profile.tsx
-import React, { useEffect, useMemo, useState } from "react";
-import toast from "react-hot-toast";
-import api from "../lib/api";
-import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 type ProfileView = {
   firstName: string;
@@ -29,17 +28,17 @@ export default function Profile() {
   const { auth, refreshAuth } = useAuth();
 
   const [me, setMe] = useState<ProfileView>({
-    firstName: auth.user?.firstName ?? "",
-    lastName: auth.user?.lastName ?? "",
-    email: auth.user?.email ?? "",
+    firstName: auth.user?.firstName ?? '',
+    lastName: auth.user?.lastName ?? '',
+    email: auth.user?.email ?? '',
   });
 
   const [loadingMe, setLoadingMe] = useState(true);
 
   const [pw, setPw] = useState<PasswordForm>({
-    currentPassword: "",
-    newPassword: "",
-    confirmNewPassword: "",
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: '',
   });
 
   const [savingPw, setSavingPw] = useState(false);
@@ -53,23 +52,23 @@ export default function Profile() {
   const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   // ✅ Delete account
-  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const run = async () => {
       setLoadingMe(true);
       try {
-        const { data } = await api.get<CheckAuthResponse>("/users/check-auth");
+        const { data } = await api.get<CheckAuthResponse>('/users/check-auth');
         setMe({
-          firstName: data.firstName ?? "",
-          lastName: data.lastName ?? "",
-          email: data.email ?? "",
+          firstName: data.firstName ?? '',
+          lastName: data.lastName ?? '',
+          email: data.email ?? '',
         });
       } catch (err: any) {
         const status = err?.response?.status;
-        if (status === 401) toast.error("Session expired or not logged in!");
-        else toast.error("Failed to load profile.");
+        if (status === 401) toast.error('Session expired or not logged in!');
+        else toast.error('Failed to load profile.');
       } finally {
         setLoadingMe(false);
       }
@@ -83,7 +82,7 @@ export default function Profile() {
     return {
       firstName: me.firstName,
       lastName: me.lastName,
-      email: me.email || auth.user?.email || "",
+      email: me.email || auth.user?.email || '',
     };
   }, [me, auth.user?.email]);
 
@@ -93,11 +92,11 @@ export default function Profile() {
   };
 
   const validateInfo = () => {
-    if (!me.firstName.trim()) return "First name is required.";
-    if (!me.lastName.trim()) return "Last name is required.";
-    if (!me.email.trim()) return "Email is required.";
+    if (!me.firstName.trim()) return 'First name is required.';
+    if (!me.lastName.trim()) return 'Last name is required.';
+    if (!me.email.trim()) return 'Email is required.';
     const emailOk = /^\S+@\S+\.\S+$/.test(me.email.trim());
-    if (!emailOk) return "Please enter a valid email address.";
+    if (!emailOk) return 'Please enter a valid email address.';
     return null;
   };
 
@@ -105,26 +104,26 @@ export default function Profile() {
   const handleSaveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!auth.isAuthenticated) return toast.error("You must be logged in.");
+    if (!auth.isAuthenticated) return toast.error('You must be logged in.');
     const err = validateInfo();
     if (err) return toast.error(err);
 
     try {
       setSavingInfo(true);
 
-      const { data } = await api.put("/users/profile", {
+      const { data } = await api.put('/users/profile', {
         firstName: me.firstName.trim(),
         lastName: me.lastName.trim(),
         email: me.email.trim(),
       });
 
-      toast.success(data?.message ?? "Profile updated successfully!");
+      toast.success(data?.message ?? 'Profile updated successfully!');
       await refreshAuth();
     } catch (error: any) {
       const msg =
         error?.response?.data?.message ??
-        (error?.response?.status === 401 ? "Not logged in!" : null) ??
-        "Failed to update profile.";
+        (error?.response?.status === 401 ? 'Not logged in!' : null) ??
+        'Failed to update profile.';
       toast.error(msg);
     } finally {
       setSavingInfo(false);
@@ -137,10 +136,10 @@ export default function Profile() {
   };
 
   const validatePassword = () => {
-    if (!pw.currentPassword) return "Current password is required.";
-    if (!pw.newPassword) return "New password is required.";
-    if (pw.newPassword.length < 8) return "New password must be at least 8 characters.";
-    if (pw.newPassword !== pw.confirmNewPassword) return "New passwords do not match.";
+    if (!pw.currentPassword) return 'Current password is required.';
+    if (!pw.newPassword) return 'New password is required.';
+    if (pw.newPassword.length < 8) return 'New password must be at least 8 characters.';
+    if (pw.newPassword !== pw.confirmNewPassword) return 'New passwords do not match.';
     return null;
   };
 
@@ -150,25 +149,25 @@ export default function Profile() {
     const err = validatePassword();
     if (err) return toast.error(err);
 
-    if (!auth.isAuthenticated) return toast.error("You must be logged in.");
+    if (!auth.isAuthenticated) return toast.error('You must be logged in.');
 
     try {
       setSavingPw(true);
 
-      const { data } = await api.put("/users/profile", {
+      const { data } = await api.put('/users/profile', {
         currPassword: pw.currentPassword,
         newPassword: pw.newPassword,
       });
 
-      setPw({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
+      setPw({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
 
-      toast.success(data?.message ?? "Profile updated successfully!");
+      toast.success(data?.message ?? 'Profile updated successfully!');
       await refreshAuth();
     } catch (error: any) {
       const msg =
         error?.response?.data?.message ??
-        (error?.response?.status === 401 ? "Not logged in!" : null) ??
-        "Failed to update password.";
+        (error?.response?.status === 401 ? 'Not logged in!' : null) ??
+        'Failed to update password.';
       toast.error(msg);
     } finally {
       setSavingPw(false);
@@ -177,53 +176,54 @@ export default function Profile() {
 
   const handleDeleteAccount = async () => {
     if (!auth.isAuthenticated) {
-      toast.error("You must be logged in.");
+      toast.error('You must be logged in.');
       return;
     }
 
-    const expected = (profile.email || "").trim().toLowerCase();
+    const expected = (profile.email || '').trim().toLowerCase();
     const typed = deleteConfirm.trim().toLowerCase();
 
     if (!expected) {
-      toast.error("Missing email. Reload profile and try again.");
+      toast.error('Missing email. Reload profile and try again.');
       return;
     }
     if (typed !== expected) {
-      toast.error("Please type your email exactly to confirm deletion.");
+      toast.error('Please type your email exactly to confirm deletion.');
       return;
     }
 
     try {
       setDeleting(true);
-      const { data } = await api.delete("/users/delete");
+      const { data } = await api.delete('/users/delete');
 
-      toast.success(data?.message ?? "Account deleted successfully!");
-      setDeleteConfirm("");
+      toast.success(data?.message ?? 'Account deleted successfully!');
+      setDeleteConfirm('');
 
       await refreshAuth();
-      navigate("/login", { replace: true });
+      navigate('/login', { replace: true });
     } catch (error: any) {
       const msg =
         error?.response?.data?.message ??
-        (error?.response?.status === 401 ? "Not logged in!" : null) ??
-        "Failed to delete account.";
+        (error?.response?.status === 401 ? 'Not logged in!' : null) ??
+        'Failed to delete account.';
       toast.error(msg);
     } finally {
       setDeleting(false);
     }
   };
 
-  // ✅ Toast confirm (모달 대신)
+  // ✅ Toast confirm
   const confirmDeleteWithToast = () => {
-    if (!auth.isAuthenticated) return toast.error("You must be logged in.");
+    if (!auth.isAuthenticated) return toast.error('You must be logged in.');
 
-    const expected = (profile.email || "").trim().toLowerCase();
+    const expected = (profile.email || '').trim().toLowerCase();
     const typed = deleteConfirm.trim().toLowerCase();
 
-    if (!expected) return toast.error("Missing email. Reload profile and try again.");
-    if (typed !== expected) return toast.error("Please type your email exactly to confirm deletion.");
+    if (!expected) return toast.error('Missing email. Reload profile and try again.');
+    if (typed !== expected)
+      return toast.error('Please type your email exactly to confirm deletion.');
 
-    const TOAST_ID = "delete-account-confirm";
+    const TOAST_ID = 'delete-account-confirm';
     toast.dismiss(TOAST_ID);
 
     toast.custom(
@@ -337,7 +337,7 @@ export default function Profile() {
                 disabled={!canSaveInfo}
                 className="bg-slate-900 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-xl transition-all active:scale-95 disabled:opacity-60"
               >
-                {savingInfo ? "Saving..." : "Save changes"}
+                {savingInfo ? 'Saving...' : 'Save changes'}
               </button>
             </div>
           </form>
@@ -358,7 +358,7 @@ export default function Profile() {
               <input
                 className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 pr-24 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
                 name="currentPassword"
-                type={showCurrentPw ? "text" : "password"}
+                type={showCurrentPw ? 'text' : 'password'}
                 value={pw.currentPassword}
                 onChange={onPwChange}
                 required
@@ -370,7 +370,7 @@ export default function Profile() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg bg-slate-100 text-slate-600 font-black text-[11px] hover:bg-slate-200 transition"
                 disabled={!auth.isAuthenticated}
               >
-                {showCurrentPw ? "Hide" : "Show"}
+                {showCurrentPw ? 'Hide' : 'Show'}
               </button>
             </div>
           </label>
@@ -383,7 +383,7 @@ export default function Profile() {
               <input
                 className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 pr-24 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
                 name="newPassword"
-                type={showNewPw ? "text" : "password"}
+                type={showNewPw ? 'text' : 'password'}
                 value={pw.newPassword}
                 onChange={onPwChange}
                 placeholder="Min 8 characters"
@@ -396,7 +396,7 @@ export default function Profile() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg bg-slate-100 text-slate-600 font-black text-[11px] hover:bg-slate-200 transition"
                 disabled={!auth.isAuthenticated}
               >
-                {showNewPw ? "Hide" : "Show"}
+                {showNewPw ? 'Hide' : 'Show'}
               </button>
             </div>
           </label>
@@ -409,7 +409,7 @@ export default function Profile() {
               <input
                 className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 pr-24 font-semibold outline-none focus:ring-2 focus:ring-blue-200"
                 name="confirmNewPassword"
-                type={showConfirmPw ? "text" : "password"}
+                type={showConfirmPw ? 'text' : 'password'}
                 value={pw.confirmNewPassword}
                 onChange={onPwChange}
                 required
@@ -421,7 +421,7 @@ export default function Profile() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg bg-slate-100 text-slate-600 font-black text-[11px] hover:bg-slate-200 transition"
                 disabled={!auth.isAuthenticated}
               >
-                {showConfirmPw ? "Hide" : "Show"}
+                {showConfirmPw ? 'Hide' : 'Show'}
               </button>
             </div>
           </label>
@@ -432,7 +432,7 @@ export default function Profile() {
               disabled={savingPw || !auth.isAuthenticated}
               className="bg-slate-900 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-xl transition-all active:scale-95 disabled:opacity-60"
             >
-              {savingPw ? "Updating..." : "Update password"}
+              {savingPw ? 'Updating...' : 'Update password'}
             </button>
           </div>
         </form>
@@ -454,7 +454,7 @@ export default function Profile() {
               className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-semibold outline-none focus:ring-2 focus:ring-rose-200"
               value={deleteConfirm}
               onChange={(e) => setDeleteConfirm(e.target.value)}
-              placeholder={profile.email ? `Type: ${profile.email}` : "Type your email"}
+              placeholder={profile.email ? `Type: ${profile.email}` : 'Type your email'}
               disabled={!auth.isAuthenticated || loadingMe}
             />
           </label>
@@ -466,7 +466,7 @@ export default function Profile() {
               disabled={!canDelete}
               className="bg-rose-600 hover:bg-rose-700 text-white px-6 py-3 rounded-xl font-black shadow-xl transition-all active:scale-95 disabled:opacity-60"
             >
-              {deleting ? "Deleting..." : "Delete account"}
+              {deleting ? 'Deleting...' : 'Delete account'}
             </button>
           </div>
         </div>

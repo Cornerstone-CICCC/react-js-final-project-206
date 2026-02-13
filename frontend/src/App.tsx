@@ -1,17 +1,17 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
-import MainLayout from "./components/layout/MainLayout";
-import Dashboard from "./pages/Dashboard";
-import CalendarPage from "./pages/Calendar";
-import { TransactionProvider } from "./context/TransactionContext";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import { TransactionPage } from "./pages/Transaction";
-import Profile from "./pages/Profile";
+import MainLayout from './components/layout/MainLayout';
+import Dashboard from './pages/Dashboard';
+import CalendarPage from './pages/Calendar';
+import { TransactionProvider } from './context/TransactionContext';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import TransactionPage from './pages/Transaction';
+import Profile from './pages/Profile';
 
-import { AuthProvider } from "./context/AuthContext";
-import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
   return (

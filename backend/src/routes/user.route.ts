@@ -11,5 +11,6 @@ userRouter.get('/check-auth', checkLogin, authController.checkAuth);
 userRouter.put('/profile', checkLogin, authController.updateAccount);
 userRouter.post('/logout', checkLogin, authController.logout);
 userRouter.delete('/delete', checkLogin, authController.deleteAccount);
+userRouter.get('/search', checkLogin, authController.searchByEmail);// Added by Bella
 
 export default userRouter;

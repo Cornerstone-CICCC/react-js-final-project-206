@@ -39,18 +39,21 @@ const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; chart: strin
 
 const DEFAULT_COLOR = { bg: 'bg-slate-50', text: 'text-slate-600', chart: '#94a3b8' };
 
-function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }) {
-  const styles = {
-    pending: { bg: 'bg-amber-50', text: 'text-amber-600', icon: Clock, label: 'Pending' },
-    accepted: {
+function StatusBadge({ status }: { status: string }) {
+  const styles: any = {
+    Pending: { bg: 'bg-amber-50', text: 'text-amber-600', icon: Clock, label: 'Pending' },
+    Accepted: {
       bg: 'bg-emerald-50',
       text: 'text-emerald-600',
       icon: CheckCircle2,
       label: 'Accepted',
     },
-    declined: { bg: 'bg-rose-50', text: 'text-rose-600', icon: XCircle, label: 'Declined' },
+    Personal: { bg: 'bg-blue-50', text: 'text-blue-600', icon: CheckCircle2, label: 'Personal' },
   };
-  const { bg, text, icon: Icon, label } = styles[status];
+
+  const currentStatus = styles[status] || styles.Pending;
+  const { bg, text, icon: Icon, label } = currentStatus;
+
   return (
     <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${bg} ${text} w-fit mx-auto`}>
       <Icon size={12} />
@@ -69,7 +72,6 @@ export default function Dashboard() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
-  // [핵심 추가] 지난달과 이번 달 상세 비교 로직
   const comparisonStats = useMemo(() => {
     const now = new Date();
     const curMonth = now.getMonth();
@@ -94,7 +96,6 @@ export default function Dashboard() {
     const diff = thisTotal - lastTotal;
     const percent = lastTotal === 0 ? 0 : (diff / lastTotal) * 100;
 
-    // 이번 달 가장 많이 쓴 카테고리 추출
     const catStats = thisMonthTransactions.reduce((acc: any, cur) => {
       acc[cur.category] = (acc[cur.category] || 0) + cur.amount;
       return acc;
@@ -184,9 +185,8 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* 2. Summary & Analysis Section (상세 분석 리포트 추가) */}
+      {/* 2. Summary & Analysis Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Monthly Spending Card */}
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm flex flex-col justify-center">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 font-mono">
             Monthly Spending
@@ -199,10 +199,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* [NEW] 상세 분석 리포트 카드 */}
         <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-900/20">
           <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-
           <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center h-full">
             <div>
               <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-3">
@@ -317,19 +315,6 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <div className="mt-6 flex flex-wrap gap-2 justify-center">
-            {categoryData.map((item) => (
-              <div
-                key={item.name}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100"
-              >
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">
-                  {item.name}
-                </span>
-              </div>
-            ))}
-          </div>
         </div>
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm">
@@ -384,7 +369,6 @@ export default function Dashboard() {
                   <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Description
                   </th>
-                  {/* Recipient 열 추가 */}
                   <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Recipient
                   </th>
@@ -399,13 +383,19 @@ export default function Dashboard() {
               <tbody className="divide-y divide-slate-50">
                 {recentTransactions.map((tx) => {
                   const catStyle = CATEGORY_COLORS[tx.category] || DEFAULT_COLOR;
+
+                  const displayDate = tx.date ? tx.date.split('T')[0] : '-';
+
                   return (
                     <tr
-                      key={tx.id}
+                      key={tx._id}
                       className="group hover:bg-slate-50/50 transition-all cursor-pointer"
-                      onClick={() => navigate('/transaction', { state: { selectedId: tx.id } })}
+                      onClick={() => navigate('/transaction', { state: { selectedId: tx._id } })}
                     >
-                      <td className="px-8 py-5 text-xs font-bold text-slate-400">{tx.date}</td>
+                      {/* 1. Date  */}
+                      <td className="px-8 py-5 text-xs font-bold text-slate-400">{displayDate}</td>
+
+                      {/* 2. Category */}
                       <td className="px-8 py-5">
                         <span
                           className={cn(
@@ -417,26 +407,73 @@ export default function Dashboard() {
                           {tx.category}
                         </span>
                       </td>
+
+                      {/* 3. Description */}
                       <td className="px-8 py-5 font-bold text-slate-900">{tx.title}</td>
 
-                      {/* 1. Recipient 데이터 표시 (이름/이메일) */}
-                      <td className="px-8 py-5 text-center text-[11px] font-bold text-slate-500 italic">
-                        {tx.recipientName || tx.shareWith || (
-                          <span className="text-slate-200 not-italic">-</span>
-                        )}
-                      </td>
-
-                      {/* 2. Status 배지 표시 */}
+                      {/* 4. Recipient*/}
                       <td className="px-8 py-5 text-center">
-                        {tx.shareWith ? (
-                          <StatusBadge status={tx.status || 'pending'} />
-                        ) : (
-                          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                            -
-                          </span>
-                        )}
+                        <div className="flex flex-col items-center justify-center gap-0.5">
+                          {(() => {
+                            const recipient: any = tx.sharedWith;
+                            const emailFallback = tx.sharedWithEmail;
+
+                            if (!recipient && !emailFallback) {
+                              return <span className="text-slate-200">-</span>;
+                            }
+
+                            if (recipient && typeof recipient === 'object') {
+                              const name =
+                                recipient.firstName || recipient.name || recipient.lastName;
+                              const email = recipient.email;
+
+                              if (name || email) {
+                                return (
+                                  <>
+                                    {name && (
+                                      <span className="text-xs font-black text-slate-900">
+                                        {name}
+                                      </span>
+                                    )}
+                                    {email && (
+                                      <span className="text-[10px] font-medium text-slate-400">
+                                        {email}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              }
+                            }
+
+                            if (typeof recipient === 'string' && recipient.length > 0) {
+                              if (recipient.includes('@')) {
+                                return (
+                                  <span className="text-[11px] font-bold text-slate-500 italic">
+                                    {recipient}
+                                  </span>
+                                );
+                              }
+                            }
+
+                            if (emailFallback) {
+                              return (
+                                <span className="text-[11px] font-bold text-slate-500 italic">
+                                  {emailFallback}
+                                </span>
+                              );
+                            }
+
+                            return <span className="text-slate-200">-</span>;
+                          })()}
+                        </div>
                       </td>
 
+                      {/* 5. Status */}
+                      <td className="px-8 py-5 text-center">
+                        <StatusBadge status={tx.status} />
+                      </td>
+
+                      {/* 6. Amount */}
                       <td className="px-8 py-5 text-right font-black text-slate-900">
                         -${tx.amount.toFixed(2)}
                       </td>

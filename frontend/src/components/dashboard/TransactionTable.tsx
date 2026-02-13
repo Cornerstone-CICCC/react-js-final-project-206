@@ -2,7 +2,6 @@ import { Search, SlidersHorizontal, Download, MoreVertical } from 'lucide-react'
 import { Button } from '../common/Button';
 import { cn } from '../../lib/utils';
 
-// 더미 데이터 (Day 5 API 연동 전까지 사용)
 const transactions = [
   {
     id: 1,
@@ -41,7 +40,7 @@ const transactions = [
 export default function TransactionTable() {
   return (
     <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-50">
-      {/* 테이블 상단 헤더 & 컨트롤 */}
+      {/* Table Header & Controls */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
           Transaction History
@@ -51,7 +50,7 @@ export default function TransactionTable() {
         </h3>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* 테이블 내 검색창 */}
+          {/* Search input inside the table */}
           <div className="relative flex-1 md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -69,7 +68,7 @@ export default function TransactionTable() {
         </div>
       </div>
 
-      {/* 실제 테이블 영역 */}
+      {/* Actual table area */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
