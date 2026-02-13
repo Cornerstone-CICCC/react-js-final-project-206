@@ -10,8 +10,12 @@ import {
   XCircle,
   Loader2,
 } from 'lucide-react';
-import { useTransactions } from '../../context/TransactionContext';
 import { cn } from '../../lib/utils';
+import api from '../../lib/api';
+import toast from 'react-hot-toast';
+import { socket } from '../../lib/socket';
+import { useAuth } from '../../context/AuthContext';
+import { useTransactions } from '../../context/TransactionContext';
 
 interface AddTransactionModalProps {
   isOpen: boolean;
@@ -21,28 +25,14 @@ interface AddTransactionModalProps {
 
 const CATEGORIES = ['Food', 'Transport', 'Rent', 'Household', 'Health', 'Education', 'Other'];
 
-// 가상 유저 데이터 (실제 연동 시 API 호출로 대체)
-const REGISTERED_USERS = [
-  {
-    email: 'partner@example.com',
-    name: 'Felix',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-  },
-  {
-    email: 'test@test.com',
-    name: 'Sarah',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
-  },
-];
-
 export default function AddTransactionModal({
   isOpen,
   onClose,
   initialDate,
 }: AddTransactionModalProps) {
-  const { addTransaction } = useTransactions();
+  const { auth } = useAuth();
+  const { fetchTransactions } = useTransactions();
 
-  // 폼 상태
   const [formData, setFormData] = useState({
     date: initialDate || new Date().toISOString().split('T')[0],
     title: '',
@@ -52,11 +42,10 @@ export default function AddTransactionModal({
     memo: '',
   });
 
-  // 이메일 검증 상태 관리
   const [emailStatus, setEmailStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   const [foundUser, setFoundUser] = useState<{ name: string; avatar: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 이메일 입력 시 유효성 검사 (디바운싱 적용)
   useEffect(() => {
     if (!formData.shareWith) {
       setEmailStatus('idle');
@@ -64,8 +53,13 @@ export default function AddTransactionModal({
       return;
     }
 
-    const timer = setTimeout(() => {
-      // 간단한 이메일 형식 체크
+    if (formData.shareWith === auth.user?.email) {
+      setEmailStatus('invalid');
+      setFoundUser(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
       if (!formData.shareWith.includes('@')) {
         setEmailStatus('invalid');
         return;
@@ -73,45 +67,55 @@ export default function AddTransactionModal({
 
       setEmailStatus('loading');
 
-      // 서버 통신 시뮬레이션 (500ms 딜레이)
-      setTimeout(() => {
-        const user = REGISTERED_USERS.find((u) => u.email === formData.shareWith);
-        if (user) {
+      try {
+        const response = await api.get(`/users/search?email=${formData.shareWith}`);
+        if (response.data) {
           setEmailStatus('valid');
-          setFoundUser({ name: user.name, avatar: user.avatar });
+          setFoundUser({
+            name: `${response.data.firstName} ${response.data.lastName}`,
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${response.data.firstName}`,
+          });
         } else {
           setEmailStatus('invalid');
           setFoundUser(null);
         }
-      }, 500);
+      } catch (error) {
+        setEmailStatus('invalid');
+        setFoundUser(null);
+      }
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [formData.shareWith]);
+  }, [formData.shareWith, auth.user?.email]);
 
   useEffect(() => {
     if (isOpen) {
-      setFormData((prev) => ({
-        ...prev,
-        date: initialDate || new Date().toISOString().split('T')[0],
-      }));
+      const handleSuccess = () => {
+        console.log('Expense saved successfully!'); // 로그로 확인
+        setIsSubmitting(false);
+        resetForm();
+        onClose();
+        // 매우 중요: 여기서 fetchTransactions가 최신 데이터를 다시 가져와야 Dashboard가 업데이트됩니다.
+        fetchTransactions();
+        toast.success('Expense saved!');
+      };
+
+      const handleError = (error: any) => {
+        setIsSubmitting(false);
+        toast.error(error.message || 'Failed to save');
+      };
+
+      socket.on('expense_saved', handleSuccess);
+      socket.on('expense_error', handleError);
+
+      return () => {
+        socket.off('expense_saved', handleSuccess);
+        socket.off('expense_error', handleError);
+      };
     }
-  }, [isOpen, initialDate]);
+  }, [isOpen, fetchTransactions]);
 
-  if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    addTransaction({
-      title: formData.title,
-      amount: parseFloat(formData.amount) || 0,
-      category: formData.category,
-      date: formData.date,
-      shareWith: formData.shareWith,
-      memo: formData.memo,
-      // 여기에 status: 'pending' 등을 추가하여 알림 시스템과 연동할 수 있습니다.
-    });
-
+  const resetForm = () => {
     setFormData({
       title: '',
       amount: '',
@@ -121,8 +125,31 @@ export default function AddTransactionModal({
       date: new Date().toISOString().split('T')[0],
     });
     setEmailStatus('idle');
-    onClose();
+    setFoundUser(null);
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!auth.user?.id || emailStatus === 'loading' || isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    const expenseData = {
+      title: formData.title,
+      amount: parseFloat(formData.amount),
+      category: formData.category,
+      date: formData.date,
+      sharedWith: formData.shareWith || null,
+      note: formData.memo, // note로 필드명 통일 확인
+      paidBy: auth.user.id,
+    };
+
+    // 백엔드가 소켓을 통해 저장 완료를 알려주지 않는 경우를 대비해
+    // 타임아웃을 걸거나, 직접 fetchTransactions를 호출하는 로직이 필요할 수 있습니다.
+    socket.emit('sendExpense', expenseData);
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
@@ -148,7 +175,6 @@ export default function AddTransactionModal({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Title */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                 Title
@@ -163,7 +189,6 @@ export default function AddTransactionModal({
               />
             </div>
 
-            {/* Amount & Date */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">
@@ -197,7 +222,6 @@ export default function AddTransactionModal({
               </div>
             </div>
 
-            {/* Category */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1">
                 <Tag size={10} /> Category
@@ -215,7 +239,6 @@ export default function AddTransactionModal({
               </select>
             </div>
 
-            {/* Recipient Email (핵심 수정 부분) */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                 Recipient Email (Request Approval)
@@ -240,7 +263,6 @@ export default function AddTransactionModal({
                   onChange={(e) => setFormData({ ...formData, shareWith: e.target.value })}
                 />
 
-                {/* 실시간 피드백 아이콘/아바타 */}
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   {emailStatus === 'loading' && (
                     <Loader2 size={16} className="text-blue-600 animate-spin" />
@@ -256,7 +278,9 @@ export default function AddTransactionModal({
                   )}
                   {emailStatus === 'invalid' && formData.shareWith && (
                     <div className="flex items-center gap-1 text-rose-500 animate-in shake-1">
-                      <span className="text-[9px] font-black uppercase">Not Found</span>
+                      <span className="text-[9px] font-black uppercase">
+                        {formData.shareWith === auth.user?.email ? 'Your Email' : 'Not Found'}
+                      </span>
                       <XCircle size={14} />
                     </div>
                   )}
@@ -264,7 +288,6 @@ export default function AddTransactionModal({
               </div>
             </div>
 
-            {/* Memo */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1">
                 <StickyNote size={10} /> Detailed Memo
@@ -278,19 +301,24 @@ export default function AddTransactionModal({
               />
             </div>
 
-            {/* Save Button */}
             <button
               type="submit"
-              disabled={emailStatus === 'loading'}
+              disabled={
+                emailStatus === 'loading' ||
+                isSubmitting ||
+                (formData.shareWith !== '' && emailStatus === 'invalid')
+              }
               className={cn(
                 'w-full font-bold py-5 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 mt-4 hover:-translate-y-0.5 active:scale-95',
-                emailStatus === 'loading'
+                emailStatus === 'loading' ||
+                  isSubmitting ||
+                  (formData.shareWith !== '' && emailStatus === 'invalid')
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-slate-900 text-white shadow-blue-600/20',
               )}
             >
-              {emailStatus === 'loading' ? (
-                'Verifying...'
+              {isSubmitting ? (
+                <Loader2 size={18} className="animate-spin" />
               ) : (
                 <>
                   <Send size={18} /> Save Expense

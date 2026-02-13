@@ -34,8 +34,9 @@ const CATEGORY_COLORS: { [key: string]: { bg: string; text: string } } = {
 
 type SortKey = 'date' | 'category' | 'shareWith' | 'amount';
 
-function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }) {
-  const styles = {
+function StatusBadge({ status }: { status: string }) {
+  const normalizedStatus = status?.toLowerCase();
+  const styles: any = {
     pending: { bg: 'bg-amber-50', text: 'text-amber-600', icon: Clock, label: 'Pending' },
     accepted: {
       bg: 'bg-emerald-50',
@@ -43,9 +44,16 @@ function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }
       icon: CheckCircle2,
       label: 'Accepted',
     },
+    approved: {
+      bg: 'bg-emerald-50',
+      text: 'text-emerald-600',
+      icon: CheckCircle2,
+      label: 'Accepted',
+    },
     declined: { bg: 'bg-rose-50', text: 'text-rose-600', icon: XCircle, label: 'Declined' },
+    rejected: { bg: 'bg-rose-50', text: 'text-rose-600', icon: XCircle, label: 'Declined' },
   };
-  const current = styles[status] || styles.pending;
+  const current = styles[normalizedStatus] || styles.pending;
   const Icon = current.icon;
   return (
     <div
@@ -64,23 +72,34 @@ function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }
 export function TransactionPage() {
   const { transactions, deleteTransaction, updateTransaction } = useTransactions();
   const location = useLocation();
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedRecipient, setSelectedRecipient] = useState<string>('All');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [isAsc, setIsAsc] = useState(false);
-
-  // 현재 수정 중인 이메일 값이 '이미 저장된 값'인지 확인하기 위한 상태
   const [isInitialValueLocked, setIsInitialValueLocked] = useState(false);
 
+  // 이메일이나 객체에서 이름을 안전하게 추출하는 헬퍼 함수
   const getRecipientDisplay = (tx: any) => {
     if (tx.recipientName) return tx.recipientName;
-    if (tx.shareWith) {
-      const id = tx.shareWith.split('@')[0];
-      return id.charAt(0).toUpperCase() + id.slice(1);
+
+    // 수정됨: sharedWith 필드 우선 참조
+    const rawShare = tx.sharedWith || tx.shareWith;
+    if (!rawShare) return null;
+
+    if (typeof rawShare === 'object') {
+      return rawShare.firstName
+        ? `${rawShare.firstName} ${rawShare.lastName || ''}`.trim()
+        : rawShare.email?.split('@')[0];
     }
-    return null;
+
+    // 문자열(이메일)인 경우
+    if (typeof rawShare === 'string' && rawShare.includes('@')) {
+      return rawShare.split('@')[0];
+    }
+
+    return 'Partner';
   };
 
   const recipientList = useMemo(() => {
@@ -90,36 +109,44 @@ export function TransactionPage() {
     return Array.from(new Set(names));
   }, [transactions]);
 
-  // 수정 모드로 진입할 때만 잠금 여부 판단
+  const selectedTx = useMemo(() => {
+    return transactions.find((t) => t.id === editingId || t._id === editingId);
+  }, [transactions, editingId]);
+
   useEffect(() => {
     const targetId = location.state?.selectedId || editingId;
     if (targetId) {
-      const tx = transactions.find((t) => t.id === targetId);
-      // 이메일이 이미 존재한다면 잠금 상태로 시작
-      if (tx?.shareWith && tx.shareWith !== '') {
+      const tx = transactions.find((t) => t.id === targetId || t._id === targetId);
+      // 수정됨: sharedWith 체크 로직 통일
+      const shareData = tx?.sharedWith || tx?.sharedWith;
+      if (shareData && shareData !== '') {
         setIsInitialValueLocked(true);
       } else {
         setIsInitialValueLocked(false);
       }
-
       if (location.state?.selectedId) {
         setEditingId(location.state.selectedId);
         window.history.replaceState({}, document.title);
       }
     }
-  }, [editingId, location.state]);
+  }, [editingId, location.state, transactions]);
 
   const filteredTransactions = useMemo(() => {
     let result = transactions.filter((tx) => {
       const name = getRecipientDisplay(tx);
+      // 수정됨: sharedWith (d 포함) 필드로 필터링 조건 통일
+      const shareData = tx.sharedWith || tx.sharedWith;
+
       const matchRecipient =
         selectedRecipient === 'All'
           ? true
           : selectedRecipient === 'Personal'
-            ? !name
+            ? !shareData
             : name === selectedRecipient;
+
       const matchCategory = selectedCategory === 'All' || tx.category === selectedCategory;
       const matchSearch = tx.title.toLowerCase().includes(searchQuery.toLowerCase());
+
       return matchRecipient && matchCategory && matchSearch;
     });
 
@@ -132,8 +159,8 @@ export function TransactionPage() {
         valA = new Date(a.date).getTime();
         valB = new Date(b.date).getTime();
       } else {
-        valA = a[sortKey] || 0;
-        valB = b[sortKey] || 0;
+        valA = (a as any)[sortKey] || 0;
+        valB = (b as any)[sortKey] || 0;
       }
       if (valA < valB) return isAsc ? -1 : 1;
       if (valA > valB) return isAsc ? 1 : -1;
@@ -145,11 +172,16 @@ export function TransactionPage() {
     return filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0);
   }, [filteredTransactions]);
 
-  const selectedTx = transactions.find((t) => t.id === editingId);
-
   const handleSendRequest = () => {
-    if (!selectedTx?.shareWith) return;
-    toast.success(`Request sent to ${selectedTx.shareWith}!`, {
+    const shareData = selectedTx?.sharedWith || (selectedTx as any)?.shareWith;
+    const targetEmail =
+      typeof shareData === 'object' && shareData !== null
+        ? (shareData as any).email
+        : shareData || '';
+
+    if (!targetEmail || !editingId) return;
+
+    toast.success(`Request sent to ${targetEmail}!`, {
       icon: '🚀',
       style: {
         borderRadius: '16px',
@@ -159,7 +191,7 @@ export function TransactionPage() {
         fontWeight: 'bold',
       },
     });
-    updateTransaction(editingId!, { status: 'pending' });
+    updateTransaction(editingId, { status: 'pending' });
   };
 
   if (!editingId) {
@@ -174,7 +206,6 @@ export function TransactionPage() {
               Full spend history
             </p>
           </div>
-
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center bg-white rounded-xl shadow-sm px-3 py-2 border border-slate-50">
               <Tag size={14} className="text-slate-400 mr-2" />
@@ -240,7 +271,6 @@ export function TransactionPage() {
             </div>
           </div>
         </div>
-
         <div className="flex-1 pb-24">
           <div className="hidden md:block bg-white rounded-[2.5rem] border border-slate-50 shadow-sm overflow-hidden overflow-x-auto">
             <table className="min-w-[800px] w-full text-left border-collapse">
@@ -269,8 +299,8 @@ export function TransactionPage() {
               <tbody className="divide-y divide-slate-50">
                 {filteredTransactions.map((tx) => (
                   <tr
-                    key={tx.id}
-                    onClick={() => setEditingId(tx.id)}
+                    key={tx._id || tx.id}
+                    onClick={() => setEditingId(tx._id || tx.id || null)}
                     className="group cursor-pointer hover:bg-blue-50/30 transition-all"
                   >
                     <td className="px-8 py-6 text-xs font-bold text-slate-400 whitespace-nowrap">
@@ -287,23 +317,26 @@ export function TransactionPage() {
                         {tx.category}
                       </span>
                     </td>
-                    <td className="px-8 py-6 font-bold text-slate-900 min-w-[200px]">{tx.title}</td>
                     <td className="px-8 py-6 text-center">
-                      {tx.shareWith ? (
-                        <div className="inline-block text-left">
-                          <p className="text-xs font-bold text-slate-900 leading-none">
-                            {getRecipientDisplay(tx)}
-                          </p>
-                          <p className="text-[9px] text-slate-400 font-medium italic mt-1">
-                            {tx.shareWith}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-slate-200 font-bold">-</span>
-                      )}
+                      {(() => {
+                        // 로직을 단순화하기 위해 변수 할당
+                        const shareData = tx.sharedWith || (tx as any).shareWith;
+                        if (!shareData) return <span className="text-slate-200 font-bold">-</span>;
+
+                        return (
+                          <div className="inline-block text-left">
+                            <p className="text-xs font-bold text-slate-900">
+                              {getRecipientDisplay(tx)}
+                            </p>
+                            <p className="text-[9px] text-slate-400 italic">
+                              {typeof shareData === 'object' ? (shareData as any).email : shareData}
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-8 py-6 text-center">
-                      {tx.shareWith ? (
+                      {tx.sharedWith || tx.sharedWith ? (
                         <StatusBadge status={tx.status || 'pending'} />
                       ) : (
                         <span className="text-slate-200">-</span>
@@ -323,7 +356,7 @@ export function TransactionPage() {
                   >
                     Total Spending
                   </td>
-                  <td className="px-8 py-8 text-right font-black text-3xl whitespace-nowrap">
+                  <td className="px-8 py-8 text-right font-black text-3xl">
                     -${currentTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
@@ -341,10 +374,9 @@ export function TransactionPage() {
         onClick={() => setEditingId(null)}
         className="flex items-center gap-2 text-slate-400 hover:text-slate-900 font-bold text-sm mb-8 transition-colors group"
       >
-        <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-        Back to List
+        <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> Back
+        to List
       </button>
-
       <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden border border-slate-50">
         <div className="p-8 md:p-12 space-y-10">
           <div className="flex justify-between items-center">
@@ -353,7 +385,7 @@ export function TransactionPage() {
             </h2>
             <button
               onClick={() => {
-                deleteTransaction(editingId);
+                if (editingId) deleteTransaction(editingId);
                 setEditingId(null);
               }}
               className="p-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-sm"
@@ -361,7 +393,6 @@ export function TransactionPage() {
               <Trash2 size={20} />
             </button>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-6">
               <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100">
@@ -373,8 +404,9 @@ export function TransactionPage() {
                   <input
                     type="number"
                     className="text-4xl font-black bg-transparent border-none outline-none w-full"
-                    value={selectedTx?.amount}
+                    value={selectedTx?.amount || 0}
                     onChange={(e) =>
+                      editingId &&
                       updateTransaction(editingId, { amount: parseFloat(e.target.value) || 0 })
                     }
                   />
@@ -387,12 +419,13 @@ export function TransactionPage() {
                 <input
                   type="text"
                   className="text-lg font-bold text-slate-900 w-full border-b-2 border-slate-100 focus:border-blue-600 py-2 outline-none transition-all"
-                  value={selectedTx?.title}
-                  onChange={(e) => updateTransaction(editingId, { title: e.target.value })}
+                  value={selectedTx?.title || ''}
+                  onChange={(e) =>
+                    editingId && updateTransaction(editingId, { title: e.target.value })
+                  }
                 />
               </div>
             </div>
-
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white p-4 rounded-2xl border border-slate-100">
@@ -400,7 +433,9 @@ export function TransactionPage() {
                   <select
                     className="text-sm font-bold w-full outline-none bg-transparent"
                     value={selectedTx?.category}
-                    onChange={(e) => updateTransaction(editingId, { category: e.target.value })}
+                    onChange={(e) =>
+                      editingId && updateTransaction(editingId, { category: e.target.value })
+                    }
                   >
                     {Object.keys(CATEGORY_COLORS).map((cat) => (
                       <option key={cat} value={cat}>
@@ -415,14 +450,14 @@ export function TransactionPage() {
                     type="date"
                     className="text-sm font-bold w-full outline-none bg-transparent"
                     value={selectedTx?.date}
-                    onChange={(e) => updateTransaction(editingId, { date: e.target.value })}
+                    onChange={(e) =>
+                      editingId && updateTransaction(editingId, { date: e.target.value })
+                    }
                   />
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Recipient Email & Request Section */}
           <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-100">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -435,16 +470,15 @@ export function TransactionPage() {
                 {isInitialValueLocked && (
                   <button
                     onClick={() => {
-                      updateTransaction(editingId!, { shareWith: '' });
+                      if (editingId) updateTransaction(editingId, { sharedWith: '' }); // 수정됨
                       setIsInitialValueLocked(false);
                     }}
-                    className="flex items-center gap-1.5 text-[9px] font-black text-rose-500 bg-rose-50 px-2.5 py-1.5 rounded-xl hover:bg-rose-500 hover:text-white transition-all uppercase"
+                    className="flex items-center gap-1.5 text-[9px] font-black text-rose-500 bg-rose-50 px-2.5 py-1.5 rounded-xl hover:bg-rose-500 transition-all uppercase"
                   >
                     <RotateCcw size={10} strokeWidth={3} /> Reset to Edit
                   </button>
                 )}
               </div>
-
               <div className="relative">
                 <input
                   type="email"
@@ -456,8 +490,14 @@ export function TransactionPage() {
                       ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed shadow-inner'
                       : 'bg-white border-white text-slate-900 focus:border-blue-600 shadow-sm',
                   )}
-                  value={selectedTx?.shareWith || ''}
-                  onChange={(e) => updateTransaction(editingId!, { shareWith: e.target.value })}
+                  value={(() => {
+                    const data = selectedTx?.sharedWith || (selectedTx as any)?.shareWith;
+                    if (typeof data === 'object' && data !== null) return (data as any).email || '';
+                    return data || '';
+                  })()}
+                  onChange={(e) =>
+                    editingId && updateTransaction(editingId, { sharedWith: e.target.value })
+                  }
                 />
                 {isInitialValueLocked && (
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
@@ -466,13 +506,12 @@ export function TransactionPage() {
                 )}
               </div>
             </div>
-
             <button
-              disabled={!selectedTx?.shareWith}
+              disabled={!(selectedTx?.sharedWith || (selectedTx as any)?.shareWith)}
               onClick={handleSendRequest}
               className={cn(
                 'w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all',
-                selectedTx?.shareWith
+                selectedTx?.sharedWith || (selectedTx as any)?.shareWith
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 hover:bg-slate-900'
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed',
               )}
@@ -480,7 +519,6 @@ export function TransactionPage() {
               <Send size={14} strokeWidth={3} /> Send Approval Request
             </button>
           </div>
-
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-slate-400">
               <StickyNote size={16} />
@@ -489,18 +527,22 @@ export function TransactionPage() {
             <textarea
               className="w-full bg-slate-50 rounded-2xl p-6 text-sm font-medium outline-none resize-none focus:ring-2 focus:ring-blue-600/5 transition-all"
               rows={4}
-              value={selectedTx?.memo || ''}
-              onChange={(e) => updateTransaction(editingId!, { memo: e.target.value })}
+              // 읽기: note가 있으면 note를, 없으면 memo를 보여줍니다.
+              value={selectedTx?.note ?? selectedTx?.memo ?? ''}
+              onChange={(e) => {
+                if (editingId) {
+                  // 쓰기: 무조건 'note' 필드에 저장하여 데이터 형식을 점진적으로 통일합니다.
+                  updateTransaction(editingId, { note: e.target.value });
+                }
+              }}
               placeholder="Add some details..."
             />
           </div>
-
           <button
             onClick={() => {
               setEditingId(null);
-
-              if (selectedTx?.shareWith) setIsInitialValueLocked(true);
-
+              if (selectedTx?.sharedWith || (selectedTx as any)?.shareWith)
+                setIsInitialValueLocked(true);
               toast.success('Transaction updated!', {
                 style: {
                   borderRadius: '12px',

@@ -1,11 +1,11 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import "./index.css";
-import App from "./App.tsx";
-import { AuthProvider } from "./contexts/AuthContext.tsx";
-import { Toaster } from "react-hot-toast";
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './index.css';
+import App from './App';
+import { AuthProvider } from './context/AuthContext';
+import { Toaster } from 'react-hot-toast';
 
-createRoot(document.getElementById("root")!).render(
+createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <App />
@@ -14,24 +14,16 @@ createRoot(document.getElementById("root")!).render(
         toastOptions={{
           duration: 4000,
           style: {
-            background: "#0f172a", // 다크 네이비
-            color: "#ffffff",
+            background: '#0f172a',
+            color: '#ffffff',
             fontWeight: 600,
-            borderRadius: "12px",
-            padding: "12px 16px",
+            borderRadius: '12px',
+            padding: '12px 16px',
           },
-          success: {
-            style: {
-              background: "#33a75d", // 초록
-            },
-          },
-          error: {
-            style: {
-              background: "#de4e4e", // 빨강
-            },
-          },
+          success: { style: { background: '#33a75d' } },
+          error: { style: { background: '#de4e4e' } },
         }}
       />
     </AuthProvider>
-  </StrictMode>
+  </StrictMode>,
 );

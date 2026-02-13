@@ -1,6 +1,6 @@
 // frontend/src/context/AuthContext.tsx
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import api from "../lib/api";
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import api from '../lib/api';
 
 export type AuthUser = {
   id: string;
@@ -10,6 +10,7 @@ export type AuthUser = {
 };
 
 type AuthState = {
+  token: any;
   user: AuthUser | null;
   isAuthenticated: boolean;
   isBooting: boolean; // 앱 최초 로딩 시 세션 체크 중
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAuth = async () => {
     try {
-      const { data } = await api.get<CheckAuthResponse>("/users/check-auth");
+      const { data } = await api.get<CheckAuthResponse>('/users/check-auth');
       setUser({
         id: data.id,
         email: data.email,
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         isAuthenticated: !!user,
         isBooting,
+        token: undefined,
       },
       refreshAuth,
       clearAuth,
@@ -81,6 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }

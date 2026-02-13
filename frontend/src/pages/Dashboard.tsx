@@ -5,7 +5,6 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  ArrowRight,
   ArrowUpRight,
   ArrowDownRight,
   Award,
@@ -29,9 +28,10 @@ import { useTransactions } from '../context/TransactionContext';
 import AddTransactionModal from '../components/dashboard/AddTransactionModal';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
-import api from '../lib/api'; // Axios 인스턴스
+import api from '../lib/api';
 import { socket } from '../lib/socket';
 import toast from 'react-hot-toast';
+import type { Transaction } from '../context/TransactionContext';
 
 const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; chart: string } } = {
   Food: { bg: 'bg-orange-50', text: 'text-orange-600', chart: '#f97316' },
@@ -74,7 +74,6 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
-  // 1. 초기 데이터 로드 (REST API)
   const fetchDashboardData = async () => {
     try {
       const [expensesRes, pendingRes] = await Promise.all([
@@ -88,40 +87,29 @@ export default function Dashboard() {
     }
   };
 
-  // 2. 실시간 소켓 리스너 설정
   useEffect(() => {
     fetchDashboardData();
-
-    // 백엔드의 io.to(recipientId).emit('expense_update_received', ...) 구독
     socket.on('expense_update_received', (payload: any) => {
       toast.success(payload.message, { icon: '🔔' });
-      // 리스트에 새 요청 즉시 추가 및 전체 데이터 갱신
       setPendingRequests((prev) => [payload.data, ...prev]);
       fetchDashboardData();
     });
-
     return () => {
       socket.off('expense_update_received');
     };
   }, []);
 
-  // 3. 승인/거절 처리 (백엔드 PUT /expenses/:id/status 연동)
   const handleStatusUpdate = async (id: string, status: 'Accepted' | 'Rejected') => {
     try {
       await api.put(`/expenses/${id}/status`, { status });
-
       toast.success(status === 'Accepted' ? 'Expense accepted!' : 'Expense rejected');
-
-      // UI 즉시 업데이트: Pending 목록에서 제거
       setPendingRequests((prev) => prev.filter((req) => req._id !== id));
-      // 전체 트랜잭션 목록 새로고침
       fetchDashboardData();
     } catch (error) {
       toast.error('Failed to update status');
     }
   };
 
-  // --- 기존 차트 및 요약 로직 유지 ---
   const currentMonthStr = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -211,7 +199,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-8 space-y-10 animate-in fade-in duration-700">
-      {/* 1. Header */}
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2 px-2">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-200">
@@ -235,7 +223,7 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* 2. Summary Card */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm flex flex-col justify-center">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 font-mono">
@@ -249,7 +237,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* AI Analysis Card */}
         <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-900/20">
           <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
           <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center h-full">
@@ -319,7 +306,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* [Notification Center] Pending Requests */}
+      {/* Notification Center */}
       {pendingRequests.length > 0 && (
         <div className="bg-blue-50/50 border border-blue-100 p-8 rounded-[2.5rem] space-y-6 animate-in slide-in-from-top-4 duration-500">
           <div className="flex items-center justify-between">
@@ -376,7 +363,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 3. Charts & History (기존과 동일) */}
+      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm">
           <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">
@@ -424,6 +411,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Recent Activity Table */}
       <div className="space-y-6">
         <h3 className="text-xl font-black text-slate-900 px-2">Recent Activity</h3>
         <div className="bg-white rounded-[2.5rem] border border-slate-50 shadow-sm overflow-hidden">
@@ -440,6 +428,9 @@ export default function Dashboard() {
                   <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     Description
                   </th>
+                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Shared With
+                  </th>
                   <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Status
                   </th>
@@ -449,9 +440,9 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {recentTransactions.map((tx) => (
+                {recentTransactions.map((tx: Transaction) => (
                   <tr
-                    key={tx._id || tx.id}
+                    key={tx._id}
                     className="group hover:bg-slate-50/50 transition-all cursor-pointer"
                   >
                     <td className="px-8 py-5 text-xs font-bold text-slate-400">
@@ -469,9 +460,24 @@ export default function Dashboard() {
                       </span>
                     </td>
                     <td className="px-8 py-5 font-bold text-slate-900">{tx.title}</td>
+                    <td className="px-8 py-5">
+                      {tx.sharedWith && typeof tx.sharedWith === 'object' ? (
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-slate-700">
+                            {tx.sharedWith.firstName} {tx.sharedWith.lastName}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {tx.sharedWith.email}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                          Personal
+                        </span>
+                      )}
+                    </td>
                     <td className="px-8 py-5 text-center">
-                      {tx.shareWith ? (
-                        // 'as any' 보다는 구체적인 타입 단언을 사용하는 것이 좋습니다.
+                      {tx.sharedWith ? (
                         <StatusBadge
                           status={
                             (tx.status?.toLowerCase() || 'pending') as
