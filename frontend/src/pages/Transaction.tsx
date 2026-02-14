@@ -47,8 +47,10 @@ function StatusBadge({ status }: { status: 'Pending' | 'Accepted' | 'Personal' |
     Personal: { bg: 'bg-slate-50', text: 'text-slate-600', icon: User, label: 'Personal' },
     Rejected: { bg: 'bg-rose-50', text: 'text-rose-600', icon: XCircle, label: 'Rejected' },
   };
+
   const current = styles[status] || styles.Pending;
   const Icon = current.icon;
+
   return (
     <div
       className={cn(
@@ -77,12 +79,13 @@ export default function TransactionPage() {
 
   const [isSearching, setIsSearching] = useState(false);
   const [foundUser, setFoundUser] = useState<{ name: string; avatar: string } | null>(null);
-  const [localEmail, setLocalEmail] = useState('');
 
   const selectedTx = useMemo(
     () => transactions.find((t) => t._id === editingId),
     [transactions, editingId],
   );
+
+  const [localEmail, setLocalEmail] = useState('');
 
   const searchUser = useCallback(async (email: string) => {
     if (!email || !email.includes('@')) {
@@ -109,33 +112,24 @@ export default function TransactionPage() {
     }
   }, []);
 
-  // [핵심] New/Edit 동기화: 편집창 열릴 때 & 데이터 변경될 때 이메일 상태 동기화
+  // 1. 핵심 수정: 편집 모드 진입 시 이메일 데이터를 강제로 주입
   useEffect(() => {
-    // 1. 편집 모드가 아닐 때는 상태 초기화
-    if (!editingId || !selectedTx) {
-      setLocalEmail('');
-      setFoundUser(null);
-      setIsInitialValueLocked(false);
-      return;
+    if (editingId && selectedTx) {
+      const email = selectedTx.sharedWithEmail || '';
+      setLocalEmail(email);
+
+      // 저장된 이메일이 있다면 즉시 유저 검색 실행
+      if (email.includes('@')) {
+        searchUser(email);
+        setIsInitialValueLocked(true); // 이미 이메일이 있으면 Lock 상태로 시작
+      } else {
+        setFoundUser(null);
+        setIsInitialValueLocked(false);
+      }
     }
+  }, [editingId, selectedTx?.sharedWithEmail]); // 의존성에 이메일을 직접 포함
 
-    // 2. 중요: 이메일 값이 있고, 현재 입력창(localEmail)이 비어있을 때만 최초 동기화
-    // 이렇게 해야 입력 도중에 selectedTx가 변해도 입력 중인 값이 초기화되지 않습니다.
-    const savedEmail = selectedTx.sharedWithEmail || '';
-
-    if (savedEmail && savedEmail.includes('@')) {
-      setLocalEmail(savedEmail);
-      setIsInitialValueLocked(true); // 기존 잠금 기능 유지
-      searchUser(savedEmail); // 유저 검색 실행
-    } else if (!savedEmail) {
-      // 이메일이 없는 내역일 경우
-      setLocalEmail('');
-      setFoundUser(null);
-      setIsInitialValueLocked(false);
-    }
-  }, [editingId, selectedTx?._id]);
-
-  // 입력 중 디바운스 검색 (New 상태일 때만 동작)
+  // 2. 입력 중인 이메일 실시간 검색
   useEffect(() => {
     if (localEmail && !isInitialValueLocked) {
       const timer = setTimeout(() => searchUser(localEmail), 500);
@@ -160,14 +154,18 @@ export default function TransactionPage() {
     return Array.from(new Set(names));
   }, [transactions]);
 
-  // 외부(Location state)에서 진입 시 처리
   useEffect(() => {
-    const targetId = location.state?.selectedId;
+    const targetId = location.state?.selectedId || editingId;
     if (targetId) {
-      setEditingId(targetId);
-      window.history.replaceState({}, document.title);
+      const tx = transactions.find((t) => t._id === targetId);
+      if (tx) {
+        if (location.state?.selectedId) {
+          setEditingId(location.state.selectedId);
+          window.history.replaceState({}, document.title);
+        }
+      }
     }
-  }, [location.state]);
+  }, [location.state, transactions, editingId]);
 
   const filteredTransactions = useMemo(() => {
     let result = transactions.filter((tx) => {
@@ -182,6 +180,7 @@ export default function TransactionPage() {
       const matchSearch = tx.title.toLowerCase().includes(searchQuery.toLowerCase());
       return matchRecipient && matchCategory && matchSearch;
     });
+
     return result.sort((a: any, b: any) => {
       let valA: any, valB: any;
       if (sortKey === 'sharedWithEmail') {
@@ -194,13 +193,21 @@ export default function TransactionPage() {
         valA = a[sortKey] || 0;
         valB = b[sortKey] || 0;
       }
-      return isAsc ? (valA < valB ? -1 : 1) : valA > valB ? -1 : 1;
+      if (valA < valB) return isAsc ? -1 : 1;
+      if (valA > valB) return isAsc ? 1 : -1;
+      return 0;
     });
   }, [transactions, searchQuery, selectedCategory, selectedRecipient, sortKey, isAsc]);
 
+  const currentTotal = useMemo(
+    () => filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0),
+    [filteredTransactions],
+  );
+
   const handleSendRequest = () => {
     if (!localEmail) return;
-    toast.success(`Request sent!`, {
+    toast.success(`Request sent to ${foundUser?.name || localEmail}!`, {
+      icon: '🚀',
       style: {
         borderRadius: '16px',
         background: '#0f172a',
@@ -215,11 +222,22 @@ export default function TransactionPage() {
 
   const handleSaveAndClose = async () => {
     if (!editingId || !selectedTx) return;
+
     if (localEmail && !foundUser && !isInitialValueLocked) {
       toast.error('Please verify the user email first');
       return;
     }
+
     await updateTransaction(editingId, { sharedWithEmail: localEmail });
+
+    if (!isInitialValueLocked && localEmail && foundUser) {
+      const confirmShare = window.confirm(
+        `Do you want to request expense sharing with ${foundUser.name}?`,
+      );
+      if (confirmShare) handleSendRequest();
+      else setIsInitialValueLocked(true);
+    }
+
     setEditingId(null);
     toast.success('Transaction updated!');
   };
@@ -333,10 +351,10 @@ export default function TransactionPage() {
                     onClick={() => setEditingId(tx._id)}
                     className="group cursor-pointer hover:bg-blue-50/30 transition-all"
                   >
-                    <td className="px-8 py-6 text-xs font-bold text-slate-400">
-                      {tx.date?.split('T')[0]}
+                    <td className="px-8 py-6 text-xs font-bold text-slate-400 whitespace-nowrap">
+                      {tx.date ? tx.date.split('T')[0] : ''}
                     </td>
-                    <td className="px-8 py-6">
+                    <td className="px-8 py-6 whitespace-nowrap">
                       <span
                         className={cn(
                           'text-[9px] font-black px-2.5 py-1 rounded-md uppercase tracking-tighter',
@@ -371,6 +389,19 @@ export default function TransactionPage() {
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="bg-slate-900 text-white">
+                  <td
+                    colSpan={5}
+                    className="px-8 py-8 text-sm font-black uppercase tracking-widest text-slate-400"
+                  >
+                    Total Spending
+                  </td>
+                  <td className="px-8 py-8 text-right font-black text-3xl whitespace-nowrap">
+                    -${currentTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -396,9 +427,10 @@ export default function TransactionPage() {
             </h2>
             <button
               onClick={async () => {
-                if (window.confirm('Delete this?')) {
+                if (window.confirm('Are you sure you want to delete this transaction?')) {
                   await deleteTransaction(editingId!);
                   setEditingId(null);
+                  toast.success('Transaction deleted');
                 }
               }}
               className="p-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-sm"
@@ -417,8 +449,9 @@ export default function TransactionPage() {
                   <span className="text-4xl font-black">$</span>
                   <input
                     type="number"
-                    className="text-4xl font-black bg-transparent border-none outline-none w-full"
+                    className="text-4xl font-black bg-transparent border-none outline-none w-full appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [appearance:textfield]"
                     value={selectedTx?.amount}
+                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
                     onChange={(e) =>
                       updateTransaction(editingId, { amount: parseFloat(e.target.value) || 0 })
                     }
@@ -431,18 +464,19 @@ export default function TransactionPage() {
                 </label>
                 <input
                   type="text"
-                  className="text-lg font-bold text-slate-900 w-full border-b-2 border-slate-100 outline-none"
+                  className="text-lg font-bold text-slate-900 w-full border-b-2 border-slate-100 focus:border-blue-600 py-2 outline-none transition-all"
                   value={selectedTx?.title}
                   onChange={(e) => updateTransaction(editingId, { title: e.target.value })}
                 />
               </div>
             </div>
+
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white p-4 rounded-2xl border border-slate-100">
                   <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Category</p>
                   <select
-                    className="text-sm font-bold w-full outline-none"
+                    className="text-sm font-bold w-full outline-none bg-transparent"
                     value={selectedTx?.category}
                     onChange={(e) => updateTransaction(editingId, { category: e.target.value })}
                   >
@@ -457,8 +491,8 @@ export default function TransactionPage() {
                   <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Date</p>
                   <input
                     type="date"
-                    className="text-sm font-bold w-full outline-none"
-                    value={selectedTx?.date?.split('T')[0]}
+                    className="text-sm font-bold w-full outline-none bg-transparent"
+                    value={selectedTx?.date ? selectedTx.date.split('T')[0] : ''}
                     onChange={(e) => updateTransaction(editingId, { date: e.target.value })}
                   />
                 </div>
@@ -482,7 +516,6 @@ export default function TransactionPage() {
                       setLocalEmail('');
                       setFoundUser(null);
                       setIsInitialValueLocked(false);
-                      updateTransaction(editingId!, { sharedWithEmail: '' });
                     }}
                     className="flex items-center gap-1.5 text-[9px] font-black text-rose-500 bg-rose-50 px-2.5 py-1.5 rounded-xl hover:bg-rose-500 hover:text-white transition-all uppercase"
                   >
@@ -493,17 +526,18 @@ export default function TransactionPage() {
               <div className="relative">
                 <input
                   type="email"
+                  placeholder="partner@example.com"
                   readOnly={isInitialValueLocked}
                   className={cn(
-                    'w-full border-2 rounded-2xl px-5 py-4 text-sm font-bold outline-none pr-12',
+                    'w-full border-2 rounded-2xl px-5 py-4 text-sm font-bold transition-all outline-none pr-12',
                     isInitialValueLocked
-                      ? 'bg-slate-100 border-slate-200 text-slate-500'
-                      : 'bg-white border-slate-200 text-slate-900 focus:border-blue-600',
+                      ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed shadow-inner'
+                      : 'bg-white border-slate-200 text-slate-900 focus:border-blue-600 shadow-sm',
                   )}
                   value={localEmail}
                   onChange={(e) => setLocalEmail(e.target.value)}
                 />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center">
                   {isInitialValueLocked ? (
                     <Lock size={16} className="text-slate-400" />
                   ) : isSearching ? (
@@ -533,11 +567,11 @@ export default function TransactionPage() {
               className={cn(
                 'w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all',
                 foundUser && !isInitialValueLocked
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-200 text-slate-400',
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 hover:bg-slate-900'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed',
               )}
             >
-              <Send size={14} /> Send Approval Request
+              <Send size={14} strokeWidth={3} /> Send Approval Request
             </button>
           </div>
 
@@ -547,10 +581,11 @@ export default function TransactionPage() {
               <span className="text-[10px] font-black uppercase tracking-widest">Memo / Notes</span>
             </div>
             <textarea
-              className="w-full bg-slate-50 rounded-2xl p-6 text-sm outline-none focus:ring-2 focus:ring-blue-600/5 transition-all"
+              className="w-full bg-slate-50 rounded-2xl p-6 text-sm font-medium outline-none resize-none focus:ring-2 focus:ring-blue-600/5 transition-all"
               rows={4}
               value={selectedTx?.note || ''}
               onChange={(e) => updateTransaction(editingId!, { note: e.target.value })}
+              placeholder="Add some details..."
             />
           </div>
 
@@ -560,11 +595,13 @@ export default function TransactionPage() {
             className={cn(
               'w-full font-black py-5 rounded-2xl transition-all uppercase tracking-widest text-sm shadow-xl',
               localEmail === '' || foundUser || isInitialValueLocked
-                ? 'bg-slate-900 text-white hover:bg-blue-600'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed',
+                ? 'bg-slate-900 text-white hover:bg-blue-600 shadow-slate-200 cursor-pointer'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none',
             )}
           >
-            Save and Close
+            <div className="flex items-center justify-center gap-2">
+              <Save size={18} /> Save and Close
+            </div>
           </button>
         </div>
       </div>
