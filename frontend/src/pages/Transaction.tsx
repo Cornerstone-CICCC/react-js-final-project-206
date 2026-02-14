@@ -145,12 +145,26 @@ export default function TransactionPage() {
   }, [localEmail, isInitialValueLocked, searchUser]);
 
   const getRecipientDisplay = (tx: any) => {
-    if (tx.sharedWith?.firstName) return `${tx.sharedWith.firstName} ${tx.sharedWith.lastName}`;
-    if (tx.sharedWith?.name) return tx.sharedWith.name;
+    // 1. 내가 '받은' 요청인 경우 (상대방이 나를 지목함)
+    if (tx.sharedWithEmail?.trim().toLowerCase() === currentUser?.email?.trim().toLowerCase()) {
+      const sender = tx.paidBy;
+      if (sender?.firstName) {
+        return `${sender.firstName} ${sender.lastName}`;
+      }
+      return 'Partner'; // 이름 데이터조차 없을 경우를 대비한 기본값
+    }
+
+    // 2. 내가 '보낸' 요청인 경우 (내가 상대방을 지목함)
+    if (tx.sharedWith?.firstName) {
+      return `${tx.sharedWith.firstName} ${tx.sharedWith.lastName}`;
+    }
+
+    // 3. 이름 데이터는 없지만 이메일만 있는 경우 (이메일 앞부분 추출)
     if (tx.sharedWithEmail) {
       const id = tx.sharedWithEmail.split('@')[0];
       return id.charAt(0).toUpperCase() + id.slice(1);
     }
+
     return null;
   };
 
@@ -405,49 +419,67 @@ export default function TransactionPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredTransactions.map((tx) => (
-                  <tr
-                    key={tx._id}
-                    onClick={() => setEditingId(tx._id)}
-                    className="group cursor-pointer hover:bg-blue-50/30 transition-all"
-                  >
-                    <td className="px-8 py-6 text-xs font-bold text-slate-400 whitespace-nowrap">
-                      {tx.date ? tx.date.split('T')[0] : ''}
-                    </td>
-                    <td className="px-8 py-6 whitespace-nowrap">
-                      <span
-                        className={cn(
-                          'text-[9px] font-black px-2.5 py-1 rounded-md uppercase tracking-tighter',
-                          CATEGORY_COLORS[tx.category]?.text,
-                          CATEGORY_COLORS[tx.category]?.bg,
+                {filteredTransactions.map((tx) => {
+                  // 내 이메일인지 확인 (소문자 비교)
+                  const isReceived =
+                    tx.sharedWithEmail?.trim().toLowerCase() ===
+                    currentUser?.email?.trim().toLowerCase();
+
+                  // 2. 상대방 정보 추출 (백엔드 변수명인 paidBy를 사용!)
+                  const senderInfo = (tx as any).paidBy;
+
+                  // 보낸 사람의 이메일 (데이터가 없으면 일단 'Request Received'로 표시)
+                  const displayEmail = isReceived
+                    ? (tx as any).paidBy?.email || 'Shared Request'
+                    : tx.sharedWithEmail;
+
+                  return (
+                    <tr
+                      key={tx._id}
+                      onClick={() => setEditingId(tx._id)}
+                      className="group cursor-pointer hover:bg-blue-50/30 transition-all"
+                    >
+                      <td className="px-8 py-6 text-xs font-bold text-slate-400 whitespace-nowrap">
+                        {tx.date ? tx.date.split('T')[0] : ''}
+                      </td>
+                      <td className="px-8 py-6 whitespace-nowrap">
+                        <span
+                          className={cn(
+                            'text-[9px] font-black px-2.5 py-1 rounded-md uppercase tracking-tighter',
+                            CATEGORY_COLORS[tx.category]?.text,
+                            CATEGORY_COLORS[tx.category]?.bg,
+                          )}
+                        >
+                          {tx.category}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 font-bold text-slate-900 min-w-[200px]">
+                        {tx.title}
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        {tx.sharedWithEmail ? (
+                          <div className="inline-block text-left">
+                            <p className="text-xs font-bold text-slate-900 leading-none">
+                              {getRecipientDisplay(tx)}{' '}
+                              {/* 여기서 이제 상대방 이름이 반환됩니다! */}
+                            </p>
+                            <p className="text-[9px] text-slate-400 font-medium italic mt-1">
+                              {displayEmail}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-slate-200 font-bold">-</span>
                         )}
-                      >
-                        {tx.category}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6 font-bold text-slate-900 min-w-[200px]">{tx.title}</td>
-                    <td className="px-8 py-6 text-center">
-                      {tx.sharedWithEmail || tx.sharedWith?.email ? (
-                        <div className="inline-block text-left">
-                          <p className="text-xs font-bold text-slate-900 leading-none">
-                            {getRecipientDisplay(tx)}
-                          </p>
-                          <p className="text-[9px] text-slate-400 font-medium italic mt-1">
-                            {tx.sharedWithEmail || tx.sharedWith?.email}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-slate-200 font-bold">-</span>
-                      )}
-                    </td>
-                    <td className="px-8 py-6 text-center">
-                      <StatusBadge status={tx.status || 'Personal'} />
-                    </td>
-                    <td className="px-8 py-6 text-right font-black text-slate-900 text-lg whitespace-nowrap">
-                      -${tx.amount.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        <StatusBadge status={tx.status || 'Personal'} />
+                      </td>
+                      <td className="px-8 py-6 text-right font-black text-slate-900 text-lg whitespace-nowrap">
+                        -${tx.amount.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="bg-slate-900 text-white">
