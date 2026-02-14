@@ -69,7 +69,8 @@ function StatusBadge({ status }: { status: 'Pending' | 'Accepted' | 'Personal' |
 }
 
 export default function TransactionPage() {
-  const { transactions, deleteTransaction, updateTransaction } = useTransactions();
+  const { transactions, deleteTransaction, updateTransaction, fetchTransactions } =
+    useTransactions();
   const location = useLocation();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -167,6 +168,44 @@ export default function TransactionPage() {
       socket.off('expense_update_received');
     };
   }, [currentUser?.email]);
+
+  useEffect(() => {
+    // 로그인한 사용자 정보가 없으면 리스너를 등록하지 않음
+    if (!currentUser) return;
+
+    // 1. 상대방이 나를 태그해서 새로운 지출을 추가했을 때 (다른 사람이 보낸 요청 수신)
+    socket.on('expense_update_received', (payload) => {
+      if (payload.sharedWithEmail === currentUser.email) {
+        // 예쁜 디자인 토스트 실행
+        showExpenseToast(payload.senderName, payload.data.title, payload.data.amount);
+        // 데이터 실시간 새로고침
+        fetchTransactions();
+      }
+    });
+
+    // 2. 내가 보낸 공동 지출 요청을 상대방이 수락/거절했을 때 (내 요청에 대한 결과 수신)
+    socket.on('expense_response_received', (payload) => {
+      const myId = (currentUser as any)._id || (currentUser as any).id;
+
+      if (payload.targetUserId === myId) {
+        const statusText = payload.status === 'Accepted' ? '승인✅' : '거절❌';
+
+        toast(`${payload.responderName}님이 '${payload.title}' 항목을 ${statusText}했습니다.`, {
+          icon: payload.status === 'Accepted' ? '🎉' : '😅',
+          duration: 4000,
+        });
+
+        // 상태 변경에 따른 데이터 새로고침
+        fetchTransactions();
+      }
+    });
+
+    // 컴포넌트가 사라질 때(언마운트) 리스너를 제거하여 중복 등록 방지
+    return () => {
+      socket.off('expense_update_received');
+      socket.off('expense_response_received');
+    };
+  }, [currentUser?.email, fetchTransactions]);
 
   const recipientList = useMemo(() => {
     const names = transactions

@@ -71,21 +71,34 @@ const respondToExpense = async (req: Request<{ id: string }>, res: Response) => 
     const expense = await Expense.findOne({
       _id: req.params.id,
       sharedWith: req.session.userId,
-    });
+    }).populate('sharedWith', 'firstName lastName'); // 응답자 이름 가져오기
 
     if (!expense) {
       res.status(404).json({ message: 'Expense invitation not found.' });
       return;
     }
 
+    const oldStatus = expense.status;
+    expense.status = status;
+    
     if (status === 'Rejected') {
       await Expense.findByIdAndDelete(req.params.id);
-      res.status(200).json({ message: 'Expense rejected and removed.' });
     } else {
-      expense.status = 'Accepted';
       await expense.save();
-      res.status(200).json({ message: 'Expense accepted!', expense });
     }
+
+    // 🔔 [추가] 결제자(paidBy)에게 응답 알림 보내기
+    const io = (global as any).io;
+    if (io) {
+      io.emit('expense_response_received', {
+        targetUserId: expense.paidBy.toString(), // 알림을 받을 사람 (결제자)
+        responderName: (expense.sharedWith as any).firstName, // 응답한 사람 이름
+        status: status, // Accepted 또는 Rejected
+        title: expense.title
+      });
+    }
+
+    res.status(200).json({ message: `Expense ${status}!`, status });
   } catch (err) {
     res.status(500).json({ message: 'Server error.' });
   }
