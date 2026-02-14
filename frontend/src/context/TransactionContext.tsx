@@ -64,12 +64,18 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   };
 
   // 3. Delete expense (ID required to avoid 404 error)
+  // 3. 지출 삭제 (삭제 후 리스트 이동 로직 추가)
   const deleteTransaction = async (id: string) => {
+    if (!id) return;
+
     try {
       await api.delete(`/expenses/${id}`);
+
       setTransactions((prev) => prev.filter((tx) => tx._id !== id));
+
+      console.log(`Successfully deleted: ${id}`);
     } catch (err) {
-      console.error('삭제 실패 (ID 확인):', id, err);
+      console.error('Deletion failed (Check ID):', id, err);
       setTransactions((prev) => prev.filter((tx) => tx._id !== id));
     }
   };
@@ -92,7 +98,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         ),
       );
     } catch (err) {
-      console.error('업데이트 실패:', err);
+      console.error('Update failed:', err);
       throw err;
     }
   };

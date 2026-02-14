@@ -34,7 +34,8 @@ export default function AddTransactionModal({
     title: '',
     amount: '',
     category: 'Food',
-    shareWith: '',
+    // 이 부분의 키값을 TransactionPage와 동일하게 sharedWithEmail로 관리하면 더 확실합니다.
+    sharedWithEmail: '',
     note: '',
   });
 
@@ -42,7 +43,8 @@ export default function AddTransactionModal({
   const [foundUser, setFoundUser] = useState<{ name: string; avatar: string } | null>(null);
 
   useEffect(() => {
-    if (!formData.shareWith || !formData.shareWith.includes('@')) {
+    // formData.sharedWithEmail로 변경
+    if (!formData.sharedWithEmail || !formData.sharedWithEmail.includes('@')) {
       setEmailStatus('idle');
       setFoundUser(null);
       return;
@@ -53,7 +55,7 @@ export default function AddTransactionModal({
 
       try {
         const response = await axios.get(
-          `http://localhost:3000/users/search?email=${formData.shareWith.trim().toLowerCase()}`,
+          `http://localhost:3000/users/search?email=${formData.sharedWithEmail.trim().toLowerCase()}`,
           { withCredentials: true },
         );
 
@@ -75,7 +77,7 @@ export default function AddTransactionModal({
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [formData.shareWith]);
+  }, [formData.sharedWithEmail]);
 
   useEffect(() => {
     if (isOpen) {
@@ -97,7 +99,8 @@ export default function AddTransactionModal({
         amount: parseFloat(formData.amount) || 0,
         category: formData.category,
         date: formData.date.substring(0, 10),
-        sharedWithEmail: formData.shareWith.trim().toLowerCase(),
+        // DB에 저장할 때 필드명을 확실히 sharedWithEmail로 보냅니다.
+        sharedWithEmail: formData.sharedWithEmail.trim().toLowerCase(),
         note: formData.note,
       });
 
@@ -105,7 +108,7 @@ export default function AddTransactionModal({
         title: '',
         amount: '',
         category: 'Food',
-        shareWith: '',
+        sharedWithEmail: '',
         note: '',
         date: new Date().toISOString().split('T')[0],
       });
@@ -154,7 +157,6 @@ export default function AddTransactionModal({
               />
             </div>
 
-            {/* Amount & Date */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">
@@ -188,7 +190,6 @@ export default function AddTransactionModal({
               </div>
             </div>
 
-            {/* Category */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1">
                 <Tag size={10} /> Category
@@ -206,7 +207,6 @@ export default function AddTransactionModal({
               </select>
             </div>
 
-            {/* Recipient Email */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                 Recipient Email (Request Approval)
@@ -227,8 +227,8 @@ export default function AddTransactionModal({
                         ? 'border-rose-300 bg-rose-50/30'
                         : 'border-transparent bg-slate-50 focus:border-blue-600/20',
                   )}
-                  value={formData.shareWith}
-                  onChange={(e) => setFormData({ ...formData, shareWith: e.target.value })}
+                  value={formData.sharedWithEmail} // shareWith에서 sharedWithEmail로 변경
+                  onChange={(e) => setFormData({ ...formData, sharedWithEmail: e.target.value })}
                 />
 
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
@@ -244,7 +244,7 @@ export default function AddTransactionModal({
                       <CheckCircle2 size={12} className="text-emerald-600" />
                     </div>
                   )}
-                  {emailStatus === 'invalid' && formData.shareWith && (
+                  {emailStatus === 'invalid' && formData.sharedWithEmail && (
                     <div className="flex items-center gap-1 text-rose-500 animate-in shake-1">
                       <span className="text-[9px] font-black uppercase">Not Found</span>
                       <XCircle size={14} />
@@ -254,7 +254,6 @@ export default function AddTransactionModal({
               </div>
             </div>
 
-            {/* Memo (note) */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1">
                 <StickyNote size={10} /> Detailed Memo
@@ -268,7 +267,6 @@ export default function AddTransactionModal({
               />
             </div>
 
-            {/* Save Button */}
             <button
               type="submit"
               disabled={emailStatus === 'loading'}
