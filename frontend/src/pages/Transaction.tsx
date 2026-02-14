@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTransactions } from '../context/TransactionContext';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import {
   Search,
@@ -22,6 +23,8 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'react-hot-toast';
+import { socket } from '../lib/socket';
+import { showExpenseToast } from '../lib/notifications';
 
 const CATEGORY_COLORS: { [key: string]: { bg: string; text: string } } = {
   Food: { bg: 'bg-orange-50', text: 'text-orange-600' },
@@ -87,6 +90,9 @@ export default function TransactionPage() {
 
   const [localEmail, setLocalEmail] = useState('');
 
+  const { auth } = useAuth();
+  const currentUser = auth.user;
+
   const searchUser = useCallback(async (email: string) => {
     if (!email || !email.includes('@')) {
       setFoundUser(null);
@@ -146,6 +152,21 @@ export default function TransactionPage() {
     }
     return null;
   };
+
+  useEffect(() => {
+    // 서버로부터 실시간 신호를 수신
+    socket.on('expense_update_received', (payload) => {
+      // 이메일이 내 이메일과 일치하는지 확인 (상대방이 나를 지목했을 때만)
+      if (payload.sharedWithEmail === currentUser?.email) {
+        // notifications.tsx에서 가져온 예쁜 토스트 실행!
+        showExpenseToast(payload.senderName, payload.data.title, payload.data.amount);
+      }
+    });
+
+    return () => {
+      socket.off('expense_update_received');
+    };
+  }, [currentUser?.email]);
 
   const recipientList = useMemo(() => {
     const names = transactions

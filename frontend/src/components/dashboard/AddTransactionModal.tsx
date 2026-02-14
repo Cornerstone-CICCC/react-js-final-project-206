@@ -99,8 +99,7 @@ export default function AddTransactionModal({
         amount: parseFloat(formData.amount) || 0,
         category: formData.category,
         date: formData.date.substring(0, 10),
-        // DB에 저장할 때 필드명을 확실히 sharedWithEmail로 보냅니다.
-        sharedWithEmail: formData.sharedWithEmail.trim().toLowerCase(),
+        sharedWithEmail: formData.sharedWithEmail.trim().toLowerCase(), // 이 부분!
         note: formData.note,
       });
 

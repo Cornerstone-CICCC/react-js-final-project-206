@@ -31,34 +31,49 @@ const getById = (id) => __awaiter(void 0, void 0, void 0, function* () {
 // Add new expense
 const add = (expenseData) => __awaiter(void 0, void 0, void 0, function* () {
     const { title, amount, category, paidBy, date, note, sharedWithEmail } = expenseData;
-    // Required fields check
+    // 🚩 로그 1: 프론트에서 넘어온 데이터 확인
+    console.log("📥 [요청 데이터 확인]:", { title, sharedWithEmail });
     if (!title || !amount || !category || !paidBy)
         return null;
     let sharedWithId = null;
     let status = 'Personal';
-    // If user provided an email, look up the person
+    // 2. 이메일이 있을 경우 상대방 유저 찾기
     if (sharedWithEmail) {
         const recipient = yield user_model_1.User.findOne({ email: sharedWithEmail.trim().toLowerCase() });
-        if (!recipient) {
-            throw new Error(`User with email ${sharedWithEmail} not found.`);
+        if (recipient) {
+            // 🚩 로그 2: 유저를 찾았을 때
+            console.log("👤 [유저 발견]:", recipient.firstName, recipient.lastName);
+            sharedWithId = recipient._id;
+            status = 'Pending';
         }
-        if (recipient._id.toString() === paidBy.toString()) {
-            throw new Error('You cannot share an expense with yourself.');
+        else {
+            // 🚩 로그 3: 유저를 못 찾았을 때 (이게 찍히면 이메일 형식이 DB와 다른 것)
+            console.log("❓ [유저 못 찾음]:", sharedWithEmail);
         }
-        sharedWithId = recipient._id;
-        status = 'Pending';
     }
-    return yield expense_model_1.Expense.create({
-        title,
-        amount,
-        category,
-        note: note || '',
-        status,
-        paidBy,
-        sharedWith: sharedWithId,
-        sharedWithEmail: sharedWithEmail === null || sharedWithEmail === void 0 ? void 0 : sharedWithEmail.trim().toLowerCase(), // Added by Bella
+    // 🚩 로그 4: 최종 저장 직전 상태 확인
+    console.log("📊 [최종 저장 상태]:", status);
+    const newExpense = yield expense_model_1.Expense.create({
+        title, amount, category, note: note || '',
+        status, paidBy, sharedWith: sharedWithId,
+        sharedWithEmail: sharedWithEmail === null || sharedWithEmail === void 0 ? void 0 : sharedWithEmail.trim().toLowerCase(),
         date: date || new Date(),
     });
+    // 🔔 소켓 전송 구간
+    if (status === 'Pending') {
+        const io = global.io;
+        console.log("📡 [소켓 엔진 확인]:", io ? "정상" : "없음(global.io 확인 필요)");
+        if (io) {
+            const sender = yield user_model_1.User.findById(paidBy);
+            io.emit('expense_update_received', {
+                sharedWithEmail: sharedWithEmail === null || sharedWithEmail === void 0 ? void 0 : sharedWithEmail.trim().toLowerCase(),
+                senderName: sender ? `${sender.firstName} ${sender.lastName}` : 'Partner',
+                data: { title: newExpense.title, amount: newExpense.amount }
+            });
+            console.log(`🚀 [알림 송출 완료] to: ${sharedWithEmail}`);
+        }
+    }
+    return newExpense;
 });
 // Update an expense
 const update = (id, data) => __awaiter(void 0, void 0, void 0, function* () {

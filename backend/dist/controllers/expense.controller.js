@@ -160,21 +160,16 @@ const getExpenseById = (req, res) => __awaiter(void 0, void 0, void 0, function*
 });
 /**
  * Create New Expense
- * Handles both Personal (no partner) and Shared (with partner) expenses.
- * @route POST /expenses
  */
 const createExpense = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     if (!req.session || !req.session.userId) {
-        res.status(401).json({
-            message: 'Not logged in!',
-        });
+        res.status(401).json({ message: 'Not logged in!' });
         return;
     }
-    const { title, amount, category, date, note, sharedWith } = req.body;
+    // 🚩 수정: sharedWith를 sharedWithEmail로 변경하여 프론트엔드와 일치시킴
+    const { title, amount, category, date, note, sharedWithEmail } = req.body;
     if (!title || !amount || !category) {
-        res.status(400).json({
-            message: 'Title, amount, and category are required.',
-        });
+        res.status(400).json({ message: 'Title, amount, and category are required.' });
         return;
     }
     try {
@@ -185,12 +180,10 @@ const createExpense = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             date,
             note,
             paidBy: req.session.userId,
-            sharedWithEmail: sharedWith,
+            sharedWithEmail: sharedWithEmail, // 🚩 전달되는 이름 확인!
         });
         if (!newExpense) {
-            res.status(400).json({
-                message: 'Failed to create new expense.',
-            });
+            res.status(400).json({ message: 'Failed to create new expense.' });
             return;
         }
         res.status(201).json(newExpense);
@@ -201,9 +194,7 @@ const createExpense = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             res.status(400).json({ message: err.message });
             return;
         }
-        res.status(500).json({
-            message: 'Server error.',
-        });
+        res.status(500).json({ message: 'Server error.' });
     }
 });
 /**

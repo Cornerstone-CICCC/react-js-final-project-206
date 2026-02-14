@@ -56,6 +56,8 @@ const io = new Server(server, {
   },
 });
 
+(global as any).io = io;
+
 // Connect to MongoDB and start server
 const MONGO_URI = process.env.MONGO_URI!;
 mongoose
@@ -67,7 +69,7 @@ mongoose
     setupExpenseSocket(io);
 
     // Start the server
-    const PORT = process.env.PORT || 5000;
+    const PORT = process.env.PORT || 3000;
     server.listen(PORT, () => {
       console.log(`Server is running on http://localhost:${PORT}`);
     });
