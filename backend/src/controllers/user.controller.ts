@@ -119,7 +119,7 @@ const checkAuth = async (req: Request, res: Response) => {
   }
 
   res.status(200).json({
-    id: user._id,
+    id: user.id,
     firstName: user.firstName,
     lastName: user.lastName,
     email: user.email,
@@ -278,6 +278,33 @@ const deleteAccount = async (req: Request, res: Response) => {
   });
 };
 
+/**
+ * Search User by Email
+ * @route GET /users/search?email=...
+ */
+const searchByEmail = async (req: Request, res: Response) => {
+  const { email } = req.query;
+
+  if (!email || typeof email !== 'string') {
+    res.status(400).json({ message: 'Email is required' });
+    return;
+  }
+
+  const user = await userService.getValidateByEmail(email.trim().toLowerCase());
+
+  if (!user) {
+    res.status(404).json({ message: 'User not found' });
+    return;
+  }
+
+  res.status(200).json({
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+  });
+};
+
 export default {
   signup,
   login,
@@ -285,4 +312,5 @@ export default {
   updateAccount,
   logout,
   deleteAccount,
+  searchByEmail,
 };

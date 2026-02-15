@@ -20,7 +20,7 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 // Middleware
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || 'http://127.0.0.1:5173',
     credentials: true,
 }));
 if (!process.env.COOKIE_PRIMARY_KEY || !process.env.COOKIE_SECONDARY_KEY) {
@@ -42,10 +42,11 @@ app.get('/', (req, res) => {
 const server = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+        origin: process.env.FRONTEND_URL || 'http://127.0.0.1:5173',
         methods: ['GET', 'POST'],
         credentials: true,
     },
+    transports: ['websocket', 'polling'],
 });
 // Connect to MongoDB and start server
 const MONGO_URI = process.env.MONGO_URI;
@@ -53,6 +54,7 @@ mongoose_1.default
     .connect(MONGO_URI, { dbName: 'budget_war_room' })
     .then(() => {
     console.log('Connected to MongoDB database');
+    app.set('io', io);
     // Start Socket.IO
     (0, expense_socket_1.setupExpenseSocket)(io);
     // Start the server

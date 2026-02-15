@@ -20,7 +20,7 @@ const app = express();
 // Middleware
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || 'http://127.0.0.1:5173',
     credentials: true,
   }),
 );
@@ -48,12 +48,14 @@ app.get('/', (req: Request, res: Response) => {
 
 // Create HTTP server and attach Socket.IO
 const server = createServer(app);
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || 'http://127.0.0.1:5173',
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  transports: ['websocket', 'polling'],
 });
 
 // Connect to MongoDB and start server
@@ -62,6 +64,8 @@ mongoose
   .connect(MONGO_URI, { dbName: 'budget_war_room' })
   .then(() => {
     console.log('Connected to MongoDB database');
+
+    app.set('io', io);
 
     // Start Socket.IO
     setupExpenseSocket(io);

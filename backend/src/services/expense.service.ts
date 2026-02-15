@@ -6,7 +6,10 @@ import { User } from '../models/user.model';
 const getAllShared = async (userId: string) => {
   return await Expense.find({
     $or: [{ paidBy: userId }, { sharedWith: userId }],
-  }).sort({ date: -1 });
+  })
+    .populate('paidBy', 'email firstName lastName')
+    .populate('sharedWith', 'email firstName lastName')
+    .sort({ date: -1 });
 };
 
 // Get a single expense by ID
@@ -48,13 +51,16 @@ const add = async (expenseData: Partial<IExpense> & { sharedWithEmail?: string }
     status,
     paidBy,
     sharedWith: sharedWithId,
+    sharedWithEmail: sharedWithEmail?.trim().toLowerCase(),
     date: date || new Date(),
   });
 };
 
 // Update an expense
 const update = async (id: string, data: Partial<IExpense>) => {
-  return await Expense.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+  return await Expense.findByIdAndUpdate(id, data, { new: true, runValidators: true }).populate(
+    'sharedWith',
+  );
 };
 
 // Delete an expense

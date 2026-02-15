@@ -113,7 +113,7 @@ const checkAuth = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         return;
     }
     res.status(200).json({
-        id: user._id,
+        id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
@@ -251,6 +251,28 @@ const deleteAccount = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         message: 'Account deleted successfully!',
     });
 });
+/**
+ * Search User by Email
+ * @route GET /users/search?email=...
+ */
+const searchByEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email } = req.query;
+    if (!email || typeof email !== 'string') {
+        res.status(400).json({ message: 'Email is required' });
+        return;
+    }
+    const user = yield user_service_1.default.getValidateByEmail(email.trim().toLowerCase());
+    if (!user) {
+        res.status(404).json({ message: 'User not found' });
+        return;
+    }
+    res.status(200).json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+    });
+});
 exports.default = {
     signup,
     login,
@@ -258,4 +280,5 @@ exports.default = {
     updateAccount,
     logout,
     deleteAccount,
+    searchByEmail,
 };
