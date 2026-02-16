@@ -17,6 +17,9 @@ dotenv.config();
 // Create server
 const app = express();
 
+// Trust proxy
+app.set('trust proxy', 1);
+
 // Define allowed origins
 const allowedOrigins = [
   process.env.FRONTEND_URL,
@@ -37,11 +40,16 @@ if (!process.env.COOKIE_PRIMARY_KEY || !process.env.COOKIE_SECONDARY_KEY) {
 
 app.use(express.json());
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 app.use(
   cookieSession({
     name: 'session',
     keys: [process.env.COOKIE_PRIMARY_KEY || process.env.COOKIE_SECONDARY_KEY],
     maxAge: 3 * 30 * 24 * 60 * 60 * 1000, // 3 months
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    httpOnly: true,
   }),
 );
 
