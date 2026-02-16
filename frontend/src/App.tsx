@@ -16,7 +16,9 @@ import Profile from './pages/Profile';
 import { useNotificationStore } from './store/notification.store';
 import { useUIStore } from './store/ui.store';
 
-const socket = io('http://localhost:3000', {
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+
+const socket = io(SOCKET_URL, {
   withCredentials: true,
   autoConnect: false,
   transports: ['websocket'],
