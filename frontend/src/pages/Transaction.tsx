@@ -294,6 +294,22 @@ export default function TransactionPage() {
     setIsInitialValueLocked(true);
   };
 
+  const handleReRequest = async (id: string) => {
+    try {
+      // 상태를 다시 'Pending'으로 돌려보냅니다.
+      await axios.put(`/api/expenses/${id}/status`, { status: 'Pending' });
+
+      // 데이터 새로고침 (이미 쓰고 계신 함수명이 fetchTransactions라면 그걸 호출)
+      fetchTransactions();
+
+      // 알림 표시
+      toast.success('Request sent again!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to re-request.');
+    }
+  };
+
   const handleSaveAndClose = async () => {
     if (!editingId || !selectedTx) return;
 
@@ -421,6 +437,7 @@ export default function TransactionPage() {
               <tbody className="divide-y divide-slate-50">
                 {filteredTransactions.map((tx) => {
                   // 내 이메일인지 확인 (소문자 비교)
+                  const isRejected = tx.status === 'Rejected';
                   const isReceived =
                     tx.sharedWithEmail?.trim().toLowerCase() ===
                     currentUser?.email?.trim().toLowerCase();
@@ -428,9 +445,13 @@ export default function TransactionPage() {
                   // 2. 상대방 정보 추출 (백엔드 변수명인 paidBy를 사용!)
                   const senderInfo = (tx as any).paidBy;
 
+                  const isOwner =
+                    senderInfo?._id === (currentUser as any)?._id ||
+                    senderInfo === (currentUser as any)?._id;
+
                   // 보낸 사람의 이메일 (데이터가 없으면 일단 'Request Received'로 표시)
                   const displayEmail = isReceived
-                    ? (tx as any).paidBy?.email || 'Shared Request'
+                    ? senderInfo?.email || 'Shared Request' // 👈 (tx as any).paidBy?.email과 똑같은 의미입니다!
                     : tx.sharedWithEmail;
 
                   return (

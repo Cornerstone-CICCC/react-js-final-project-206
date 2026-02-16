@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Expense = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
+;
 const ExpenseSchema = new mongoose_1.Schema({
     title: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0 },

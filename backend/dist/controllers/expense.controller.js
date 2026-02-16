@@ -84,8 +84,11 @@ const respondToExpense = (req, res) => __awaiter(void 0, void 0, void 0, functio
         }
         const oldStatus = expense.status;
         expense.status = status;
+        // controllers/expense.controller.ts 내 respondToExpense 함수 수정
         if (status === 'Rejected') {
-            yield expense_model_1.Expense.findByIdAndDelete(req.params.id);
+            // await Expense.findByIdAndDelete(req.params.id); // ❌ 삭제 코드를 지우세요.
+            expense.status = 'Rejected'; // ✅ 상태만 Rejected로 변경
+            yield expense.save();
         }
         else {
             yield expense.save();
@@ -212,22 +215,27 @@ const createExpense = (req, res) => __awaiter(void 0, void 0, void 0, function* 
  * @route PUT /expenses/:id
  */
 const updatedExpense = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    // 1. 필요한 필드들을 꺼냅니다.
     const { title, amount, category, date, note, status } = req.body;
     try {
-        const updated = yield expense_service_1.default.update(req.params.id, req.body);
+        // 2. 업데이트할 데이터 객체를 명확히 만듭니다.
+        // status가 undefined면 아예 제외해서 기존 DB 값을 보존하게 합니다.
+        const updateData = Object.assign({ title,
+            amount,
+            category,
+            date,
+            note }, (status && { status }) // status 값이 존재할 때만 객체에 추가
+        );
+        const updated = yield expense_service_1.default.update(req.params.id, updateData);
         if (!updated) {
-            res.status(404).json({
-                message: 'Unable to update Expense: Not found',
-            });
+            res.status(404).json({ message: 'Unable to update Expense: Not found' });
             return;
         }
         res.status(200).json(updated);
     }
     catch (err) {
         console.error(err);
-        res.status(500).json({
-            message: 'Server error.',
-        });
+        res.status(500).json({ message: 'Server error.' });
     }
 });
 /**

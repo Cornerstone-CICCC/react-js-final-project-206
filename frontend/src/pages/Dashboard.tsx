@@ -49,6 +49,8 @@ function StatusBadge({ status }: { status: string }) {
       label: 'Accepted',
     },
     Personal: { bg: 'bg-blue-50', text: 'text-blue-600', icon: CheckCircle2, label: 'Personal' },
+    // ✅ Rejected 스타일 추가
+    Rejected: { bg: 'bg-rose-50', text: 'text-rose-600', icon: XCircle, label: 'Rejected' },
   };
 
   const currentStatus = styles[status] || styles.Pending;
@@ -82,12 +84,14 @@ export default function Dashboard() {
 
     const thisMonthTransactions = transactions.filter((tx) => {
       const d = new Date(tx.date);
-      return d.getMonth() === curMonth && d.getFullYear() === curYear;
+      return d.getMonth() === curMonth && d.getFullYear() === curYear && tx.status !== 'Rejected';
     });
 
     const lastMonthTransactions = transactions.filter((tx) => {
       const d = new Date(tx.date);
-      return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear;
+      return (
+        d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear && tx.status !== 'Rejected'
+      );
     });
 
     const thisTotal = thisMonthTransactions.reduce((sum, tx) => sum + tx.amount, 0);
@@ -115,8 +119,8 @@ export default function Dashboard() {
   }, [transactions]);
 
   const categoryData = useMemo(() => {
-    const currentMonthTransactions = transactions.filter((tx) =>
-      tx.date.startsWith(currentMonthStr),
+    const currentMonthTransactions = transactions.filter(
+      (tx) => tx.date.startsWith(currentMonthStr) && tx.status !== 'Rejected',
     );
     const stats = currentMonthTransactions.reduce((acc: any, cur) => {
       acc[cur.category] = (acc[cur.category] || 0) + cur.amount;
@@ -147,7 +151,7 @@ export default function Dashboard() {
     ];
     return months.map((month, index) => {
       const total = transactions
-        .filter((tx) => new Date(tx.date).getMonth() === index)
+        .filter((tx) => new Date(tx.date).getMonth() === index && tx.status !== 'Rejected')
         .reduce((sum, tx) => sum + tx.amount, 0);
       return { name: month, amount: total };
     });
@@ -409,7 +413,17 @@ export default function Dashboard() {
                       </td>
 
                       {/* 3. Description */}
-                      <td className="px-8 py-5 font-bold text-slate-900">{tx.title}</td>
+                      {/* 3. Description 수정 */}
+                      <td
+                        className={cn(
+                          'px-8 py-5 font-bold transition-all',
+                          tx.status === 'Rejected'
+                            ? 'text-slate-400 line-through'
+                            : 'text-slate-900',
+                        )}
+                      >
+                        {tx.title}
+                      </td>
 
                       {/* 4. Recipient*/}
                       <td className="px-8 py-5 text-center">
@@ -474,7 +488,14 @@ export default function Dashboard() {
                       </td>
 
                       {/* 6. Amount */}
-                      <td className="px-8 py-5 text-right font-black text-slate-900">
+                      <td
+                        className={cn(
+                          'px-8 py-5 text-right font-black transition-all',
+                          tx.status === 'Rejected'
+                            ? 'text-slate-400 line-through'
+                            : 'text-slate-900',
+                        )}
+                      >
                         -${tx.amount.toFixed(2)}
                       </td>
                     </tr>

@@ -8,7 +8,7 @@ export type ExpenseCategory =
   | 'Health'
   | 'Education'
   | 'Other';
-export type ExpenseStatus = 'Pending' | 'Accepted' | 'Personal';
+export type ExpenseStatus = 'Pending' | 'Accepted' | 'Personal'| 'Rejected';;
 
 export interface IExpense extends Document {
   title: string;
