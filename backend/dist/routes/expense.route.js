@@ -1,0 +1,20 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const expense_controller_1 = __importDefault(require("../controllers/expense.controller"));
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const expenseRouter = (0, express_1.Router)();
+expenseRouter.use(auth_middleware_1.checkLogin);
+expenseRouter.get('/', expense_controller_1.default.getAllExpenses);
+expenseRouter.get('/summary', expense_controller_1.default.getExpenseSummary);
+expenseRouter.get('/monthly', expense_controller_1.default.getMonthlyStats);
+expenseRouter.get('/pending', expense_controller_1.default.getPendingRequests);
+expenseRouter.put('/:id/status', expense_controller_1.default.respondToExpense);
+expenseRouter.get('/:id', expense_controller_1.default.getExpenseById);
+expenseRouter.post('/', expense_controller_1.default.createExpense);
+expenseRouter.put('/:id', expense_controller_1.default.updatedExpense);
+expenseRouter.delete('/:id', expense_controller_1.default.deleteExpense);
+exports.default = expenseRouter;
